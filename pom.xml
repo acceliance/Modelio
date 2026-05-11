@@ -13,7 +13,7 @@ This pom executes a maven target on ALL the (eclipse) features that compose the 
 	<packaging>pom</packaging>
 
 	<properties>
-		<tycho-version>2.2.0</tycho-version>
+		<tycho-version>4.0.13</tycho-version>
 		<tycho-groupid>org.eclipse.tycho</tycho-groupid>
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
@@ -26,136 +26,12 @@ This pom executes a maven target on ALL the (eclipse) features that compose the 
 	</properties>
 	
 
+	<!-- P2 repos resolved from .target file only (Tycho 2.2.0 Windows workaround).
+		 Run ./generate-target.sh before building to create rcp.target with absolute paths. -->
 	<repositories>
-				<!-- Eclipse RCP platform -->
-        <repository>
-          <id>modelio</id>
-          <url>https://repository.modelio.org</url>
-        </repository>
-				<repository>
-					<id>rcp-Eclipse</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/rcp-eclipse/eclipse</url>
-				</repository>
-				<repository>
-					<id>rcp-Eclipse-fr</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/rcp-eclipse/eclipse-fr</url>
-				</repository>
-				<repository>
-					<id>SWT</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/rcp-eclipse/swt</url>
-				</repository>
-		
-				<!-- Third-party Libraries re-packaged by Modeliosoft or Modeliosoft libraries -->
-				<repository>
-					<id>jaxb</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/javax/jaxb</url>
-				</repository>
-				<repository>
-					<id>astyle</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/org.astyle/astyle</url>
-				</repository>
-				<repository>
-					<id>tika</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/apache/tika</url>
-				</repository>
-				<repository>
-					<id>jena</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/apache/jena</url>
-				</repository>
-				<repository>
-					<id>xerces</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/apache/xerces</url>
-				</repository>
-				<repository>
-					<id>oauth</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/oauth/oauth</url>
-				</repository>
-				<repository>
-					<id>praticalxml</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/sf-practicalxml/praticalxml</url>
-				</repository>
-				<repository>
-					<id>jdbm</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/modelio-integ/org.jdbm/jdbm</url>
-				</repository>
-		
-				<!-- Third-party libraries  -->
-				<repository>
-					<id>log4j</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/apache/log4j</url>
-				</repository>
-				<repository>
-					<id>logback</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/ch.qos/logback</url>
-				</repository>
-				<repository>
-					<id>commons-compress</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/apache/commons-compress</url>
-				</repository>
-				<repository>
-					<id>commons-lang</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/apache/commons-lang</url>
-				</repository>
-				<repository>
-					<id>freemarker</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/apache/freemarker</url>
-				</repository>
-				<repository>
-					<id>nebula-nattable</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.eclipse/nebula-nattable</url>
-				</repository>
-				<repository>
-					<id>nebula-incubator</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.eclipse/nebula-incubator</url>
-				</repository>
-				<repository>
-					<id>nebula</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.eclipse/nebula</url>
-				</repository>
-				<repository>
-					<id>gef-draw2d</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.eclipse/gef-draw2d</url>
-				</repository>
-				<repository>
-					<id>uml2</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.eclipse/uml2</url>
-				</repository>
-				<repository>
-					<id>emf</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.eclipse/emf</url>
-				
-				</repository>		
-				<repository>
-					<id>slf4j</id>
-					<layout>p2</layout>
-					<url>file://${modelio.ws.path}/dev-platform/rcp-target/org.slf4j/slf4j</url>
-				</repository>
 		<repository>
-			<id>openjdk-jre11</id>
-			<layout>p2</layout>
-			<url>file://${modelio.ws.path}/dev-platform/pack-resources/openjdk-jre11</url>
+			<id>modelio</id>
+			<url>https://repository.modelio.org</url>
 		</repository>
 	</repositories>
 
@@ -167,9 +43,7 @@ This pom executes a maven target on ALL the (eclipse) features that compose the 
 				<artifactId>tycho-maven-plugin</artifactId>
 				<version>${tycho-version}</version>
 				<extensions>true</extensions>
-				<configuration>
-					<resolver>p2</resolver>
-				</configuration>
+				<!-- resolver config removed for Tycho 4.x compatibility -->
 			</plugin>
 
 			<plugin>
@@ -214,6 +88,7 @@ This pom executes a maven target on ALL the (eclipse) features that compose the 
 							<version>5.4.1-SNAPSHOT</version>
 						</artifact>
 					</target>
+					<executionEnvironment>JavaSE-11</executionEnvironment>
 				</configuration>
 			</plugin>
 
@@ -259,7 +134,7 @@ This pom executes a maven target on ALL the (eclipse) features that compose the 
 					</executions>
 				</plugin>
 				<plugin>
-					<groupId>org.eclipse.tycho.extras</groupId>
+					<groupId>org.eclipse.tycho</groupId>
 					<artifactId>target-platform-validation-plugin</artifactId>
 					<version>${tycho-version}</version>
 					<configuration>

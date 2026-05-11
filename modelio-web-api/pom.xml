@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>org.modelio</groupId>
+    <artifactId>modelio-web-api</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <name>Modelio Web API</name>
+    <description>REST/WebSocket API layer for Modelio UML Modeler - Phase 1 of SWT to Web/React migration</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <modelio.version>5.4.1-SNAPSHOT</modelio.version>
+        <springdoc.version>2.5.0</springdoc.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- OpenAPI / Swagger -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- EMF Core Runtime (kept per migration plan) -->
+        <dependency>
+            <groupId>org.eclipse.emf</groupId>
+            <artifactId>org.eclipse.emf.common</artifactId>
+            <version>2.29.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.emf</groupId>
+            <artifactId>org.eclipse.emf.ecore</artifactId>
+            <version>2.35.0</version>
+        </dependency>
+
+        <!-- Jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            TODO: Phase 1 - Add Modelio core JARs as local dependencies once extracted from Tycho build.
+            The following modules will be needed:
+            - org.modelio.core.kernel (SmKernel, MObject)
+            - org.modelio.core.metamodel.api (UML/BPMN interfaces)
+            - org.modelio.core.metamodel.impl (implementations)
+            - org.modelio.core.session (ICoreSession, ITransaction)
+            - org.modelio.core.store.exml (persistence)
+            - org.modelio.core.project (GProject, IModuleStore)
+            - org.modelio.platform.mda.infra (IModuleManagementService)
+
+            Once Tycho is decoupled, these become standard Maven JARs installable via:
+            mvn install:install-file -Dfile=<path> -DgroupId=org.modelio -DartifactId=<module> -Dversion=5.4.1
+        -->
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

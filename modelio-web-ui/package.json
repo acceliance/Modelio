@@ -1,0 +1,44 @@
+{
+  "name": "modelio-web-ui",
+  "version": "1.0.0",
+  "description": "Modelio UML Modeler - React Web Frontend (Phase 2 of SWT-to-React migration)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@tanstack/react-virtual": "^3.5.0",
+    "zustand": "^4.5.2",
+    "@xyflow/react": "^12.0.0",
+    "dagre": "^0.8.5",
+    "react-resizable-panels": "^2.0.19",
+    "@radix-ui/react-context-menu": "^2.2.1",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.1",
+    "@radix-ui/react-tabs": "^1.1.0",
+    "@radix-ui/react-toolbar": "^1.1.0",
+    "@radix-ui/react-tooltip": "^1.1.2",
+    "lucide-react": "^0.378.0",
+    "@stomp/stompjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/dagre": "^0.7.52",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^9.4.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.1",
+    "vitest": "^1.6.0"
+  }
+}

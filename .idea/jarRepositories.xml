@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteRepositoriesConfiguration">
+    <remote-repository>
+      <option name="id" value="log4j" />
+      <option name="name" value="log4j" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/apache/log4j" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="jaxb" />
+      <option name="name" value="jaxb" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/javax/jaxb" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="logback" />
+      <option name="name" value="logback" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/ch.qos/logback" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="openjdk-jre11" />
+      <option name="name" value="openjdk-jre11" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/pack-resources/openjdk-jre11" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="jena" />
+      <option name="name" value="jena" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/apache/jena" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="rcp-Eclipse" />
+      <option name="name" value="rcp-Eclipse" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/rcp-eclipse/eclipse" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="slf4j" />
+      <option name="name" value="slf4j" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.slf4j/slf4j" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="SWT" />
+      <option name="name" value="SWT" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/rcp-eclipse/swt" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="praticalxml" />
+      <option name="name" value="praticalxml" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/sf-practicalxml/praticalxml" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="nebula-nattable" />
+      <option name="name" value="nebula-nattable" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.eclipse/nebula-nattable" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="jboss.community" />
+      <option name="name" value="JBoss Community repository" />
+      <option name="url" value="https://repository.jboss.org/nexus/content/repositories/public/" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="xerces" />
+      <option name="name" value="xerces" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/apache/xerces" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="nebula-incubator" />
+      <option name="name" value="nebula-incubator" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.eclipse/nebula-incubator" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="astyle" />
+      <option name="name" value="astyle" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/org.astyle/astyle" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="nebula" />
+      <option name="name" value="nebula" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.eclipse/nebula" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="central" />
+      <option name="name" value="Central Repository" />
+      <option name="url" value="https://repo.maven.apache.org/maven2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="uml2" />
+      <option name="name" value="uml2" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.eclipse/uml2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="tika" />
+      <option name="name" value="tika" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/apache/tika" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="central" />
+      <option name="name" value="Maven Central repository" />
+      <option name="url" value="https://repo1.maven.org/maven2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="rcp-Eclipse-fr" />
+      <option name="name" value="rcp-Eclipse-fr" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/rcp-eclipse/eclipse-fr" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="emf" />
+      <option name="name" value="emf" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.eclipse/emf" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="oauth" />
+      <option name="name" value="oauth" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/oauth/oauth" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="modelio" />
+      <option name="name" value="modelio" />
+      <option name="url" value="https://repository.modelio.org" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="commons-compress" />
+      <option name="name" value="commons-compress" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/apache/commons-compress" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="freemarker" />
+      <option name="name" value="freemarker" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/apache/freemarker" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="jdbm" />
+      <option name="name" value="jdbm" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/modelio-integ/org.jdbm/jdbm" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="commons-lang" />
+      <option name="name" value="commons-lang" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/apache/commons-lang" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="gef-draw2d" />
+      <option name="name" value="gef-draw2d" />
+      <option name="url" value="file://C:\Users\joset\source\repos\Modelio/${project.parent.relativePath}/dev-platform/rcp-target/org.eclipse/gef-draw2d" />
+    </remote-repository>
+  </component>
+</project>
