@@ -1,5 +1,21 @@
 link:https://www.modelio.org[image:README/logo-modelio-v4.png[]]
 
+image:https://img.shields.io/badge/Modelio-5.4.1-blue[Modelio 5.4.1,link=https://github.com/ModelioOpenSource/Modelio/releases/tag/v5.4.1,window=_blank]
+image:https://img.shields.io/badge/licence-GPL%20v3-blue?logo=gnu&logoColor=white[GPL v3,link=LICENSE]
+image:https://img.shields.io/badge/Java-11-007396?logo=openjdk&logoColor=white[Java 11]
+image:https://img.shields.io/badge/build-Maven%20%2F%20Tycho%204.0.13-C71A36?logo=apachemaven&logoColor=white[Maven / Tycho]
+image:https://img.shields.io/badge/standards-UML2%20%7C%20BPMN2%20%7C%20ArchiMate%20%7C%20XMI-informational[Supported standards]
+image:https://img.shields.io/badge/fork%20of-ModelioOpenSource%2FModelio-lightgrey?logo=github&logoColor=white[Fork of ModelioOpenSource/Modelio,link=https://github.com/ModelioOpenSource/Modelio,window=_blank]
+
+*Modelio Web (experimental)* —
+image:https://img.shields.io/badge/status-experimental-orange[Experimental]
+image:https://img.shields.io/badge/Java-17-007396?logo=openjdk&logoColor=white[Java 17]
+image:https://img.shields.io/badge/Spring%20Boot-3.2.5-6DB33F?logo=springboot&logoColor=white[Spring Boot 3.2.5]
+image:https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black[React 18.3]
+image:https://img.shields.io/badge/TypeScript-5.4-3178C6?logo=typescript&logoColor=white[TypeScript 5.4]
+image:https://img.shields.io/badge/Vite-5.3-646CFF?logo=vite&logoColor=white[Vite 5.3]
+image:https://img.shields.io/badge/contributed%20by-Acceliance-orange[Acceliance,link=https://www.acceliance.fr,window=_blank]
+
 == Modelio 5.4.1 Release
 
 We are pleased to announce the release of Modelio 5.4.1
@@ -76,6 +92,87 @@ In the Systems and Automation Department at Federal University of Santa Catarina
 This project contains the model for the Online Shopping Cart system, including all the models used to specify and realize the IT system.
 This model addresses the development of an online shopping cart system, that allows suppliers to sell their products directly online to customers. It is provided as a UML example covering the analysis of the business context and processes, and the design and deployment of a possible implementation.
 
+
+== Modelio Web — Experimental contribution by Acceliance
+
+WARNING: *Experimental work in progress.* This is a research prototype, not a released Modelio product and not a replacement
+for the desktop application. It is not suitable for production use, and its APIs and architecture are expected to change.
+
+https://www.acceliance.fr[Acceliance] contributes to this fork an experimental effort to make Modelio available as a
+*web-based modeler*, by progressively decoupling the modeling core from its Eclipse SWT/GEF user interface and exposing
+it through a REST/WebSocket API consumed by a browser front end.
+
+=== Motivation
+
+The Modelio core — metamodel, kernel, sessions, transactions, EXML persistence and the graphical model (`Gm*`) layer — has
+*no SWT dependency*. Only the `modelio/app/*` presentation layer is bound to Eclipse RCP. This makes it possible to keep the
+proven modeling engine and rewrite only the user interface for the web.
+
+=== Architecture
+
+[cols="1,2,1",options="header"]
+|===
+| Layer | Content | Status
+
+| `modelio/`
+| Existing Eclipse RCP desktop application (UML/BPMN editors, SWT/GEF)
+| Unchanged upstream code
+
+| `modelio-web-api/`
+| Spring Boot 3.2 REST + WebSocket (STOMP) backend wrapping the Modelio core — projects, elements, diagrams, transactions, JMDAC modules, XMI/BPMN import-export
+| Experimental, service layer still largely stubbed
+
+| `modelio-web-ui/`
+| React 18 + TypeScript + Vite front end — model explorer, diagram view, properties view
+| Experimental
+|===
+
+The migration strategy is documented in link:MIGRATION_PLAN.md[MIGRATION_PLAN.md].
+
+=== Current limitations
+
+* The backend service methods are *stubs*: they carry `TODO` markers describing the exact Modelio core API to call, but the
+core integration is not wired yet.
+* This is blocked on extracting the Modelio core modules from the Tycho/OSGi build into standard Maven artefacts, so that
+`modelio-web-api` can depend on them. The procedure is described in link:CLAUDE.md[CLAUDE.md].
+* Only a subset of diagram types and model operations is addressed so far.
+
+=== Running the experimental web version
+
+Backend (Java 17, Maven 3.9+), served on port 8080:
+
+[source,bash]
+----
+cd modelio-web-api
+mvn spring-boot:run
+----
+
+Front end (Node.js 18+), served on port 5173 and proxying `/api` to the backend:
+
+[source,bash]
+----
+cd modelio-web-ui
+npm install
+npm run dev
+----
+
+Then open `http://localhost:5173`. The OpenAPI documentation is available at `http://localhost:8080/swagger-ui.html`.
+
+=== Licensing and attribution of this contribution
+
+This repository is a *fork* of https://github.com/ModelioOpenSource/Modelio[ModelioOpenSource/Modelio], which is published by
+Modeliosoft under the *GNU General Public License version 3 or later*. The GPL expressly allows modified versions to be
+published, and this contribution is made on that basis:
+
+* *Modified work.* This fork has been modified by Acceliance. The `modelio-web-api` and `modelio-web-ui` components, together
+with the accompanying migration documentation, were added starting in May 2026. The upstream Modelio source is otherwise
+retained as-is, with its original Modeliosoft copyright notices intact.
+* *Same licence.* The whole of this work, including the Acceliance contribution, is released under the *GNU GPL v3 or later*.
+See link:LICENSE[LICENSE].
+* *No affiliation.* This fork is *not* an official Modeliosoft or Modelio Open Source release, and it is neither endorsed by
+nor supported by them. "Modelio" and the Modelio logo are trademarks of their respective owners; the GPL grants no rights over
+trademarks, and they are used here only to identify the upstream project this work derives from.
+* *Warranty.* As stated in the GPL, this contribution is provided *without any warranty*.
 
 == Build from Source
 
