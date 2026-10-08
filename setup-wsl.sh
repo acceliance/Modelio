@@ -5,7 +5,7 @@
 # One-time setup of a WSL Ubuntu environment for building legacy Modelio
 # (Tycho / Eclipse RCP), e.g. to cross-build the macOS product on Linux.
 #
-# Installs: base tools, SDKMAN, JDK 11 (Temurin), Maven 3.9.x
+# Installs: base tools, SDKMAN, JDK 17 (runs Maven/Tycho) + JDK 11 (toolchain), Maven 3.9.x
 # Clones:   the Modelio repo into ~/modelio (Linux filesystem, NOT /mnt/c)
 #
 # Usage (inside Ubuntu):
@@ -15,13 +15,15 @@
 #   REPO_URL=git@github.com:acceliance/Modelio.git bash setup-wsl.sh
 #   REPO_DIR=$HOME/src/modelio bash setup-wsl.sh
 #   JAVA_VERSION=11.0.25-tem MAVEN_VERSION=3.9.9 bash setup-wsl.sh
+#   SKIP_APT=1 bash setup-wsl.sh      # packages already installed (no sudo needed)
 # =============================================================================
 
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/acceliance/Modelio.git}"
 REPO_DIR="${REPO_DIR:-$HOME/modelio}"
-JAVA_VERSION="${JAVA_VERSION:-11.0.25-tem}"
+JAVA_VERSION="${JAVA_VERSION:-17.0.13-tem}"   # runs Maven/Tycho 4 (needs 17+)
+JAVA11_VERSION="${JAVA11_VERSION:-11.0.25-tem}" # compile toolchain (JavaSE-1.8/JavaSE-11 bundles)
 MAVEN_VERSION="${MAVEN_VERSION:-3.9.9}"
 
 if [[ "$PWD" == /mnt/* ]]; then
@@ -30,8 +32,12 @@ if [[ "$PWD" == /mnt/* ]]; then
 fi
 
 echo "== 1/5 Base packages =="
-sudo apt-get update
-sudo apt-get install -y curl zip unzip git ca-certificates build-essential xz-utils dos2unix
+if [ "${SKIP_APT:-0}" = "1" ]; then
+    echo "SKIP_APT=1: assuming curl zip unzip git build-essential xz-utils are installed."
+else
+    sudo apt-get update
+    sudo apt-get install -y curl zip unzip git ca-certificates build-essential xz-utils dos2unix
+fi
 
 echo "== 2/5 SDKMAN =="
 export SDKMAN_DIR="${SDKMAN_DIR:-$HOME/.sdkman}"
@@ -47,12 +53,27 @@ echo "== 3/5 JDK $JAVA_VERSION =="
 sdk install java "$JAVA_VERSION" < /dev/null || true
 sdk default java "$JAVA_VERSION"
 
+sdk install java "$JAVA11_VERSION" < /dev/null || true
+
 echo "== 4/5 Maven $MAVEN_VERSION =="
 sdk install maven "$MAVEN_VERSION" < /dev/null || true
 sdk default maven "$MAVEN_VERSION"
 set -u
 
-java -version
+# Toolchains: bundles declare JavaSE-1.8 / JavaSE-11 (useJDK=BREE)
+J11="$SDKMAN_DIR/candidates/java/$JAVA11_VERSION"
+J17="$SDKMAN_DIR/candidates/java/$JAVA_VERSION"
+mkdir -p "$HOME/.m2"
+cat > "$HOME/.m2/toolchains.xml" <<TC
+<?xml version="1.0" encoding="UTF-8"?>
+<toolchains>
+  <toolchain><type>jdk</type><provides><id>JavaSE-1.8</id><version>11</version><vendor>Temurin</vendor></provides><configuration><jdkHome>$J11</jdkHome></configuration></toolchain>
+  <toolchain><type>jdk</type><provides><id>JavaSE-11</id><version>11</version><vendor>Temurin</vendor></provides><configuration><jdkHome>$J11</jdkHome></configuration></toolchain>
+  <toolchain><type>jdk</type><provides><id>JavaSE-17</id><version>17</version><vendor>Temurin</vendor></provides><configuration><jdkHome>$J17</jdkHome></configuration></toolchain>
+</toolchains>
+TC
+
+"$J17/bin/java" -version
 mvn -version
 
 echo "== 5/5 Repository =="
