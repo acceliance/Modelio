@@ -120,6 +120,37 @@ jobs:
         run: |
           bash .github/scripts/package-dmg.sh ${{ matrix.arch }} modelio-*-macosx-${{ matrix.arch }}.tar.gz             "$PWD/Modelio-5.4.1-macosx-${{ matrix.arch }}.dmg"
 
+      - name: Test run-on-mac.sh (install from the .dmg, three ways)
+        run: |
+          DMG="$PWD/Modelio-5.4.1-macosx-${{ matrix.arch }}.dmg"
+          export INSTALL_DIR="$RUNNER_TEMP/Apps"
+          APPDIR="$INSTALL_DIR/Modelio 5.4.1.app"
+          check() {
+            test -x "$APPDIR/Contents/MacOS/modelio"
+            codesign --verify --strict --verbose=2 "$APPDIR"
+            if xattr -lr "$APPDIR" | grep -q com.apple.quarantine; then echo "quarantine flag left on the installed app"; exit 1; fi
+            echo "OK: $1"
+          }
+          echo "### 1. script from the repo, pointed at the .dmg"
+          bash .github/scripts/run-on-mac.sh --no-launch "$DMG"; check "path to .dmg"; rm -rf "$INSTALL_DIR"
+
+          echo "### 2. the one-liner: script from inside the mounted image"
+          MNT="$RUNNER_TEMP/mnt-test"; mkdir -p "$MNT"
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" -quiet
+          ls -la "$MNT"
+          bash "$MNT/run-on-mac.sh" --no-launch
+          hdiutil detach "$MNT" -quiet
+          check "run from inside the image"; rm -rf "$INSTALL_DIR"
+
+          echo "### 3. a downloaded copy: quarantine flag + SHA256SUMS.txt next to the .dmg"
+          DL="$RUNNER_TEMP/dl"; mkdir -p "$DL"; cp "$DMG" .github/scripts/run-on-mac.sh "$DL/"
+          (cd "$DL" && shasum -a 256 Modelio-*.dmg > SHA256SUMS.txt && xattr -w com.apple.quarantine "0081;5f000000;Safari;" Modelio-*.dmg && xattr -l Modelio-*.dmg)
+          bash "$DL/run-on-mac.sh" --no-launch "$DL/$(basename "$DMG")"; check "downloaded copy with checksum"; rm -rf "$INSTALL_DIR"
+          if [ "${{ matrix.arch }}" = aarch64 ]; then
+            echo "### 4. no argument: pick the .dmg matching this Mac (Apple Silicon runner)"
+            bash "$DL/run-on-mac.sh" --no-launch; check "auto-detected .dmg"
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: modelio-dmg-${{ matrix.arch }}

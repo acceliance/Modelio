@@ -47,11 +47,18 @@ STAGE="$WORK/stage"
 mkdir "$STAGE"
 ditto "$APP" "$STAGE/$APPNAME"
 ln -s /Applications "$STAGE/Applications"
+cp "$(cd "$(dirname "$0")" && pwd)/run-on-mac.sh" "$STAGE/run-on-mac.sh"
+chmod +x "$STAGE/run-on-mac.sh"
 cat > "$STAGE/README.txt" <<EOF
 Modelio $VERSION - macOS ($ARCH) - unsigned test build
 =====================================================
 
-Install
+Install and run - one command (Terminal)
+  bash "/Volumes/Modelio $VERSION ($ARCH)/run-on-mac.sh"           # installs to /Applications, clears the quarantine flag, launches
+  bash "/Volumes/Modelio $VERSION ($ARCH)/run-on-mac.sh" --log     # same, with the Eclipse/OSGi log in the Terminal
+  (add --no-launch to only install; INSTALL_DIR=~/Applications changes the install folder)
+
+Install by hand
   1. Drag "$APPNAME" onto the Applications shortcut in this window.
   2. This build has an ad-hoc signature only (no Apple Developer ID, not notarized), so macOS blocks the first
      launch of a downloaded copy. Either
