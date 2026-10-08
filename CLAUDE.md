@@ -62,11 +62,12 @@ Modelio/
 # Full build (requires Eclipse target platform in dev-platform/)
 mvn clean install
 
-# Requires: Java 11, Maven 3.x, Tycho 2.2.0
+# Maven/Tycho 4.0.13 must RUN on JDK 17+; bundles compile for Java 8/11 via ~/.m2/toolchains.xml
+# (ids JavaSE-1.8 and JavaSE-11 -> a JDK 11, JavaSE-17 -> a JDK 17). Build fails without toolchains.
 # Note: Dependencies are resolved from MANIFEST.MF via P2, not pom.xml
 ```
 
-On Windows CLI builds, `rcp.target` needs absolute paths — `build.cmd` wraps the whole flow:
+On CLI builds, `rcp.target` needs absolute paths — `build.cmd` wraps the whole flow:
 
 ```bash
 export ECLIPSE_WS="C:/path/to/Modelio"
@@ -74,7 +75,23 @@ export ECLIPSE_WS="C:/path/to/Modelio"
 cd AGGREGATOR && mvn clean install -Dmaven.test.skip=true
 ```
 
+`generate-target.sh` overwrites the tracked `rcp.target` with machine-specific paths (don't commit that). The reactor does not read `rcp.target` directly: `dev-platform/rcp-target` installs it as `org.modelio:rcp` into `~/.m2`, and every module resolves against that artifact — after regenerating the target, rebuild `dev-platform/rcp-target` too.
+
 There is no per-test command for the legacy build; tests are skipped in the CLI flow.
+
+### macOS product (cross-built on Linux/WSL)
+
+```bash
+bash setup-wsl.sh        # once, inside Ubuntu: JDK 17 + JDK 11, Maven, toolchains.xml, clone to ~/modelio
+./build-mac.sh           # generate target + Tycho -Pplatform.mac,product.org -> dist/modelio-*-macosx-x86_64.tar.gz
+./build-mac.sh --products-only   # re-run only rcp-target + products after a full build
+./build-mac.sh --check-only      # re-inspect an existing archive
+```
+
+- Intel (`macosx/cocoa/x86_64`) only; the Eclipse 4.18 target has no `macosx.aarch64` SWT. No signing, notarization or `.dmg` (needs macOS).
+- Build on the Linux filesystem (`~/modelio`), not `/mnt/c` (slow, loses exec bits/symlinks).
+- The bundled JRE is a prebuilt p2 repo (`dev-platform/pack-resources/openjdk-jre11`: `content.jar`, `artifacts.jar`, `.xz` copies and `binary/` root zips). Adding a platform means adding a root zip, a unit in `content.xml`, an artifact in `artifacts.xml` and regenerating the `.jar`/`.xz` copies. `generate-target.sh` must load it as an `InstallableUnit` p2 location — a `Directory` location silently drops the native root archives.
+- Empty directories listed in a bundle's `build.properties` `bin.includes` must contain a `.gitkeep`, otherwise Tycho packaging fails in a fresh clone.
 
 ### modelio-web-api (Spring Boot Backend)
 
@@ -222,7 +239,7 @@ To switch the backend to the real core, build the legacy tree then run `./instal
 
 ### Legacy Java (modelio/)
 
-- Java 11, Eclipse RCP conventions
+- Bundles target Java 11 (some Java 8 BREEs), Eclipse RCP conventions
 - OSGi bundles with `MANIFEST.MF` dependency declarations
 - Tycho build with `eclipse-plugin` packaging
 - E4 dependency injection (`@Inject`, `@PostConstruct`)
