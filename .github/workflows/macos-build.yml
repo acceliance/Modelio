@@ -167,6 +167,13 @@ jobs:
               exit 1
             fi
             if grep -qE "org\.modelio|logback" "$LOG"; then
+              JV="$(grep -m1 '^java.version=' "$LOG" | cut -d= -f2)"
+              echo "application java.version=$JV"
+              case "$JV" in
+                11.*) ;;
+                *) echo "::error::The application ran on Java '$JV', not the bundled Java 11 (launcher did not use the bundled JRE)"
+                   diagnostics; kill "$PID" 2>/dev/null; exit 1 ;;
+              esac
               echo "Modelio initialised after about $((i*5))s ($(grep -cE 'org\.modelio' "$LOG") org.modelio log lines)"
               sleep 10   # let startup continue a little, then summarise what it did
               echo "---- log summary: $(wc -l < "$LOG") lines, $(grep -ciE 'exception|error' "$LOG") mention exception/error ----"
