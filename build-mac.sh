@@ -21,7 +21,7 @@
 #                                  # after a previous full build)
 #   ./build-mac.sh --offline       # mvn -o
 #   ./build-mac.sh --check-only    # only inspect an existing archive in products/target
-#   ./build-mac.sh --arm64         # Apple Silicon (macosx/cocoa/aarch64); fetches the Eclipse 4.24 launcher online
+#   ./build-mac.sh --arm64         # Apple Silicon (macosx/cocoa/aarch64); adds the launcher after the Tycho build
 # =============================================================================
 
 set -euo pipefail
@@ -49,7 +49,7 @@ TARGET_FILE="dev-platform/rcp-target/rcp.target"
 MVN_PROFILES="platform.mac,product.org"
 ARCH_TAG="x86_64"
 if [ "$ARM64" -eq 1 ]; then
-    # Apple Silicon: aarch64 environment; generate-target.sh adds the Eclipse 4.24 launcher (needs internet)
+    # Apple Silicon: aarch64 environment (launcher is added after the build, see add_arm64_launcher)
     MVN_PROFILES="platform.mac.arm,product.org"
     ARCH_TAG="aarch64"
     export ARM64=1
@@ -85,6 +85,39 @@ check_archive() {
     [ "$win_leak" -gt 0 ] && echo "WARNING: $win_leak win32/gtk SWT entries in the macOS archive"
     [ "$problems" -eq 0 ] && echo "OK: basic checks passed (this does NOT prove the app launches)."
     return $problems
+}
+
+# Apple Silicon: Tycho cannot assemble the native launcher for macosx/aarch64 from the Eclipse 4.18 target
+# (see products/macos-aarch64/README.txt). Add launcher, Info.plist and icon to the finished archive.
+add_arm64_launcher() {
+    local archive="$1"
+    local root="$REPO_ROOT/dev-platform/rcp-target/rcp-eclipse/eclipse-aarch64/binary/org.eclipse.equinox.executable_root.cocoa.macosx.aarch64_3.8.1700.v20220509-0833"
+    local plist="$REPO_ROOT/products/macos-aarch64/Info.plist.template"
+    local icns="$REPO_ROOT/products/icons/modelio.icns"
+    for f in "$root" "$plist" "$icns"; do
+        [ -f "$f" ] || { echo "ERROR: missing $f"; return 1; }
+    done
+    command -v unzip >/dev/null || { echo "ERROR: unzip not found (run setup-wsl.sh)"; return 1; }
+
+    local work app version
+    work="$(mktemp -d)"
+    tar xzf "$archive" -C "$work" 2>/dev/null
+    app="$(ls -d "$work"/*.app | head -1)"
+    [ -d "$app" ] || { echo "ERROR: no .app in $archive"; rm -rf "$work"; return 1; }
+    version="$(grep -m1 -o '<version>[^<]*' "$REPO_ROOT/pom.xml" | sed 's/<version>//; s/-SNAPSHOT//')"
+    [ -n "$version" ] || version="5.4.1"
+
+    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+    unzip -p "$root" Eclipse.app/Contents/MacOS/launcher > "$app/Contents/MacOS/modelio"
+    chmod 755 "$app/Contents/MacOS/modelio"
+    cp "$icns" "$app/Contents/Resources/modelio.icns"
+    sed "s/@VERSION@/$version/g" "$plist" > "$app/Contents/Info.plist"
+
+    # repack with a clean owner and the same top-level folder
+    ( cd "$work" && tar czf "$archive.new" --owner=0 --group=0 --numeric-owner "$(basename "$app")" )
+    mv -f "$archive.new" "$archive"
+    rm -rf "$work"
+    echo "Added arm64 launcher, Info.plist and icon to $(basename "$archive")"
 }
 
 find_mac_archive() {
@@ -151,6 +184,9 @@ fi
 mkdir -p "$DIST_DIR"
 OUT="$DIST_DIR/modelio-5.4.1-macosx-${ARCH_TAG}.tar.gz"
 cp -f "$ARCHIVE" "$OUT"
+if [ "$ARM64" -eq 1 ]; then
+    add_arm64_launcher "$OUT" || exit 1
+fi
 ls -lh "$OUT"
 check_archive "$OUT" || true
 
