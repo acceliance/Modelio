@@ -292,9 +292,14 @@ jobs:
           screencapture -x "$RUNNER_TEMP/screenshot-open-${{ matrix.arch }}.png" 2>&1 || echo "screencapture failed"
           [ -n "$LOGF" ] && { echo "---- log tail:"; tail -15 "$LOGF" | cut -c1-180; }
           if [ "$OK" != 1 ]; then echo "::error::launched with open: the app did not reach the workspace stage"; exit 1; fi
-          if ! ps -axo args | grep -q "[M]odelio 5.4.1.app/Contents/Eclipse/jre/Contents/Home/bin/java"; then
-            echo "::error::launched with open: not running on the bundled JRE"; ps -axo args | grep "[b]in/java" | cut -c1-200; exit 1
-          fi
+          # the macOS launcher loads the JVM inside its own process (no separate java process): look at the loaded libjvm
+          PID="$(pgrep -f "Contents/MacOS/modelio" | head -1)"
+          JVMLIB="$(lsof -p "$PID" 2>/dev/null | grep -E "libjvm.dylib" | awk '{print $NF}' | head -1)"
+          echo "libjvm loaded by the launcher process $PID: $JVMLIB"
+          case "$JVMLIB" in
+            *"Modelio 5.4.1.app/Contents/Eclipse/jre/Contents/Home/"*) ;;
+            *) echo "::error::launched with open: not running on the bundled JRE (libjvm: '$JVMLIB')"; exit 1 ;;
+          esac
           if grep -qE "Application error|could not be found in the registry|UnsatisfiedLinkError" "$LOGF"; then
             echo "::error::launched with open: application error in the log"; grep -nE -A4 "Application error|UnsatisfiedLinkError" "$LOGF" | head -20; exit 1
           fi
