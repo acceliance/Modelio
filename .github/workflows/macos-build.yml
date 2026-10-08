@@ -168,6 +168,14 @@ jobs:
             fi
             if grep -qE "org\.modelio|logback" "$LOG"; then
               echo "Modelio initialised after about $((i*5))s ($(grep -cE 'org\.modelio' "$LOG") org.modelio log lines)"
+              sleep 10   # let startup continue a little, then summarise what it did
+              echo "---- log summary: $(wc -l < "$LOG") lines, $(grep -ciE 'exception|error' "$LOG") mention exception/error ----"
+              echo "---- first 25 lines ----"; head -25 "$LOG" | cut -c1-200
+              echo "---- most frequent messages (numbers masked) ----"
+              sed -E 's/^[0-9:.,]+ *//; s/[0-9]+/N/g' "$LOG" | cut -c1-120 | sort | uniq -c | sort -rn | head -8
+              echo "---- last 25 lines ----"; tail -25 "$LOG" | cut -c1-200
+              echo "---- exception/error lines (first 10) ----"; grep -iE 'exception|error' "$LOG" | head -10 | cut -c1-220
+              if kill -0 "$PID" 2>/dev/null; then echo "process still alive after summary"; else echo "::warning::process exited during the extra 10 s"; fi
               kill "$PID" 2>/dev/null
               exit 0
             fi
