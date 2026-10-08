@@ -121,6 +121,9 @@ MVN_ARGS=(clean install -Dmaven.test.skip=true "-P$MVN_PROFILES")
 [ "$OFFLINE" -eq 1 ] && MVN_ARGS+=(-o)
 START=$(date +%s)
 if [ "$PRODUCTS_ONLY" -eq 1 ]; then
+    # the target definition (org.modelio:rcp) is installed into ~/.m2 by dev-platform/rcp-target;
+    # refresh it so the freshly generated rcp.target is the one products/ resolves against
+    (cd dev-platform/rcp-target && mvn "${MVN_ARGS[@]}")
     (cd products && mvn "${MVN_ARGS[@]}")
 else
     (cd AGGREGATOR && mvn "${MVN_ARGS[@]}")
