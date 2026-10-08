@@ -12,6 +12,7 @@
 		<location path="${project_loc:/rcp-target}/rcp-eclipse/eclipse" type="Directory"/>
 		<location path="${project_loc:/rcp-target}/rcp-eclipse/eclipse-fr" type="Directory"/>
 		<location path="${project_loc:/rcp-target}/rcp-eclipse/swt" type="Directory"/>
+		<location path="${project_loc:/rcp-target}/rcp-eclipse/eclipse-aarch64" type="Directory"/>
 
 		<!-- Third-party Libraries re-packaged by Modeliosoft or Modeliosoft libraries -->
 		<location path="${project_loc:/rcp-target}/modelio-integ/org.astyle/astyle" type="Directory"/>

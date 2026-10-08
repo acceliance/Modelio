@@ -42,6 +42,7 @@ cat > "$TARGET_FILE" <<EOF
 		<location path="$BASE/rcp-eclipse/eclipse" type="Directory"/>
 		<location path="$BASE/rcp-eclipse/eclipse-fr" type="Directory"/>
 		<location path="$BASE/rcp-eclipse/swt" type="Directory"/>
+		<location path="$BASE/rcp-eclipse/eclipse-aarch64" type="Directory"/>
 		<location path="$BASE/modelio-integ/org.astyle/astyle" type="Directory"/>
 		<location path="$BASE/modelio-integ/apache/tika" type="Directory"/>
 		<location path="$BASE/modelio-integ/apache/jena" type="Directory"/>
