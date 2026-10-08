@@ -21,6 +21,7 @@
 #                                  # after a previous full build)
 #   ./build-mac.sh --offline       # mvn -o
 #   ./build-mac.sh --check-only    # only inspect an existing archive in products/target
+#   ./build-mac.sh --arm64         # Apple Silicon (macosx/cocoa/aarch64); adds the launcher after the Tycho build
 # =============================================================================
 
 set -euo pipefail
@@ -31,11 +32,13 @@ cd "$REPO_ROOT"
 PRODUCTS_ONLY=0
 OFFLINE=0
 CHECK_ONLY=0
+ARM64=0
 for arg in "$@"; do
     case "$arg" in
         --products-only) PRODUCTS_ONLY=1 ;;
         --offline)       OFFLINE=1 ;;
         --check-only)    CHECK_ONLY=1 ;;
+        --arm64)         ARM64=1 ;;
         -h|--help)       sed -n 2,26p "$0"; exit 0 ;;
         *) echo "Unknown option: $arg"; exit 2 ;;
     esac
@@ -44,6 +47,13 @@ done
 DIST_DIR="$REPO_ROOT/dist"
 TARGET_FILE="dev-platform/rcp-target/rcp.target"
 MVN_PROFILES="platform.mac,product.org"
+ARCH_TAG="x86_64"
+if [ "$ARM64" -eq 1 ]; then
+    # Apple Silicon: aarch64 environment (launcher is added after the build, see add_arm64_launcher)
+    MVN_PROFILES="platform.mac.arm,product.org"
+    ARCH_TAG="aarch64"
+    export ARM64=1
+fi
 
 check_archive() {
     local archive="$1"
@@ -77,12 +87,47 @@ check_archive() {
     return $problems
 }
 
+# Apple Silicon: Tycho cannot assemble the native launcher for macosx/aarch64 from the Eclipse 4.18 target
+# (see products/macos-aarch64/README.txt). Add launcher, Info.plist and icon to the finished archive.
+add_arm64_launcher() {
+    local archive="$1"
+    local root="$REPO_ROOT/dev-platform/rcp-target/rcp-eclipse/eclipse-aarch64/binary/org.eclipse.equinox.executable_root.cocoa.macosx.aarch64_3.8.1700.v20220509-0833"
+    local plist="$REPO_ROOT/products/macos-aarch64/Info.plist.template"
+    local icns="$REPO_ROOT/products/icons/modelio.icns"
+    for f in "$root" "$plist" "$icns"; do
+        [ -f "$f" ] || { echo "ERROR: missing $f"; return 1; }
+    done
+    command -v unzip >/dev/null || { echo "ERROR: unzip not found (run setup-wsl.sh)"; return 1; }
+
+    local work app version
+    work="$(mktemp -d)"
+    tar xzf "$archive" -C "$work" 2>/dev/null
+    app="$(ls -d "$work"/*.app | head -1)"
+    [ -d "$app" ] || { echo "ERROR: no .app in $archive"; rm -rf "$work"; return 1; }
+    version="$(grep -m1 -o '<version>[^<]*' "$REPO_ROOT/pom.xml" | sed 's/<version>//; s/-SNAPSHOT//')"
+    [ -n "$version" ] || version="5.4.1"
+
+    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+    unzip -p "$root" Eclipse.app/Contents/MacOS/launcher > "$app/Contents/MacOS/modelio"
+    chmod 755 "$app/Contents/MacOS/modelio"
+    cp "$icns" "$app/Contents/Resources/modelio.icns"
+    sed "s/@VERSION@/$version/g" "$plist" > "$app/Contents/Info.plist"
+
+    # repack with a clean owner and the same top-level folder
+    ( cd "$work" && tar czf "$archive.new" --owner=0 --group=0 --numeric-owner "$(basename "$app")" )
+    mv -f "$archive.new" "$archive"
+    rm -rf "$work"
+    echo "Added arm64 launcher, Info.plist and icon to $(basename "$archive")"
+}
+
 find_mac_archive() {
-    find "$REPO_ROOT/products/target" -type f \( -name '*macosx*cocoa*x86_64*.tar.gz' -o -name '*macosx*.tar.gz' \) 2>/dev/null | head -1
+    find "$REPO_ROOT/products/target" -type f -name "*macosx*cocoa*${ARCH_TAG}*.tar.gz" 2>/dev/null | head -1
 }
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
-    ARCHIVE="$(find_mac_archive)"
+    # prefer the finished archive in dist/ (for aarch64 it has the launcher added after the Tycho build)
+    ARCHIVE="$DIST_DIR/modelio-5.4.1-macosx-${ARCH_TAG}.tar.gz"
+    [ -f "$ARCHIVE" ] || ARCHIVE="$(find_mac_archive)"
     [ -z "$ARCHIVE" ] && { echo "No macOS archive found under products/target"; exit 1; }
     check_archive "$ARCHIVE"
     exit $?
@@ -139,8 +184,11 @@ if [ -z "$ARCHIVE" ]; then
     exit 1
 fi
 mkdir -p "$DIST_DIR"
-OUT="$DIST_DIR/modelio-5.4.1-macosx-x86_64.tar.gz"
+OUT="$DIST_DIR/modelio-5.4.1-macosx-${ARCH_TAG}.tar.gz"
 cp -f "$ARCHIVE" "$OUT"
+if [ "$ARM64" -eq 1 ]; then
+    add_arm64_launcher "$OUT" || exit 1
+fi
 ls -lh "$OUT"
 check_archive "$OUT" || true
 

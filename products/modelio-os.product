@@ -9,6 +9,8 @@
    <launcherArgs>
       <programArgs>-clearPersistedState
       </programArgs>
+      <programArgsMac>-vm ../Eclipse/jre/Contents/Home/bin/java
+      </programArgsMac>
       <vmArgs>-Xms1024m -Xmx4096m -Dpython.console.encoding=UTF-8
       </vmArgs>
       <vmArgsLin>-Dorg.eclipse.swt.internal.webkitgtk.ignoretlserrors=true

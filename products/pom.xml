@@ -71,6 +71,11 @@
 									<ws>cocoa</ws>
 									<arch>x86_64</arch>
 								</environment>
+								<environment>
+									<os>macosx</os>
+									<ws>cocoa</ws>
+									<arch>aarch64</arch>
+								</environment>
 							</environments>
 						</configuration>
 					</plugin>
@@ -223,6 +228,38 @@
 									<ws>cocoa</ws>
 									<arch>x86_64</arch>
 								</environment>
+								<environment>
+									<os>macosx</os>
+									<ws>cocoa</ws>
+									<arch>aarch64</arch>
+								</environment>
+							</environments>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>platform.mac.arm</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>${tycho-groupid}</groupId>
+						<artifactId>target-platform-configuration</artifactId>
+						<version>${tycho-version}</version>
+						<configuration>
+							<separateEnvironments>true</separateEnvironments>
+							<environments>
+								<environment>
+									<os>macosx</os>
+									<ws>cocoa</ws>
+									<arch>aarch64</arch>
+								</environment>
+								<environment>
+									<os>macosx</os>
+									<ws>cocoa</ws>
+									<arch>aarch64</arch>
+								</environment>
 							</environments>
 						</configuration>
 					</plugin>
@@ -286,6 +323,11 @@
 									<os>macosx</os>
 									<ws>cocoa</ws>
 									<arch>x86_64</arch>
+								</environment>
+								<environment>
+									<os>macosx</os>
+									<ws>cocoa</ws>
+									<arch>aarch64</arch>
 								</environment>
 							</environments>
 						</configuration>

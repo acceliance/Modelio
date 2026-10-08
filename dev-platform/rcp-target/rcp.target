@@ -7,6 +7,7 @@
 		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/rcp-eclipse/eclipse" type="Directory"/>
 		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/rcp-eclipse/eclipse-fr" type="Directory"/>
 		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/rcp-eclipse/swt" type="Directory"/>
+		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/rcp-eclipse/eclipse-aarch64" type="Directory"/>
 		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/modelio-integ/org.astyle/astyle" type="Directory"/>
 		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/modelio-integ/apache/tika" type="Directory"/>
 		<location path="C:/Users/joset/source/repos/Modelio/dev-platform/rcp-target/modelio-integ/apache/jena" type="Directory"/>

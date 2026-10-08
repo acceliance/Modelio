@@ -1,8 +1,8 @@
 name: macOS build
 
-# Cross-builds the macOS (cocoa/x86_64) product with Tycho on Linux, then smoke-tests
-# the archive on a macOS runner (extract, clear quarantine, start the app, check it stays up).
-# Not covered: signing, notarization, .dmg, Apple Silicon, any real UI interaction.
+# Cross-builds the macOS products (Intel x86_64 and Apple Silicon aarch64) with Tycho on Linux, then smoke-tests
+# each archive on a matching macOS runner (extract, clear quarantine, start the app, check it stays up).
+# Not covered: signing, notarization, .dmg, any real UI interaction.
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build macOS product (Linux runner)
+    name: Build macOS products (Linux runner)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -67,13 +67,21 @@ jobs:
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml', '**/MANIFEST.MF') }}
           restore-keys: m2-${{ runner.os }}-
 
-      - name: Build
+      - name: Build Intel (x86_64)
         run: |
           chmod +x build-mac.sh generate-target.sh
           ./build-mac.sh
 
-      - name: Archive sanity check
+      - name: Intel archive sanity check
         run: ./build-mac.sh --check-only
+
+      # The features were installed into ~/.m2 by the full Intel build above and already contain the
+      # aarch64 entries, so only the target definition and the products module are rebuilt.
+      - name: Build Apple Silicon (aarch64)
+        run: ./build-mac.sh --arm64 --products-only
+
+      - name: Apple Silicon archive sanity check
+        run: ./build-mac.sh --arm64 --check-only
 
       - uses: actions/upload-artifact@v4
         with:
@@ -82,25 +90,46 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelio-macosx-aarch64
+          path: dist/modelio-*-macosx-aarch64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
   smoke-test:
-    name: Smoke test (macOS runner)
+    name: Smoke test (${{ matrix.arch }})
     needs: build
-    # Intel runner: the product is x86_64. If this label is unavailable for your account/plan,
-    # switch to macos-latest (Apple Silicon) and make sure Rosetta 2 is installed.
-    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Intel runner for the x86_64 product. If this label is unavailable for your account/plan,
+          # use macos-latest (Apple Silicon) with Rosetta 2 installed.
+          - arch: x86_64
+            runner: macos-15-intel
+          # Apple Silicon runner for the native aarch64 product.
+          - arch: aarch64
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: modelio-macosx-x86_64
+          name: modelio-macosx-${{ matrix.arch }}
 
       - name: Extract and clear quarantine
         run: |
-          tar xzf modelio-*-macosx-x86_64.tar.gz
+          echo "runner arch: $(uname -m)"
+          tar xzf modelio-*-macosx-${{ matrix.arch }}.tar.gz
           APP="$(ls -d *.app | head -1)"
           echo "APP=$APP" >> "$GITHUB_ENV"
           xattr -dr com.apple.quarantine "$APP" || true
           ls -l "$APP/Contents/MacOS" "$APP/Contents/Eclipse" | head -30
+
+      - name: Binary architectures
+        run: |
+          file "$APP/Contents/MacOS/modelio" "$APP/Contents/Eclipse/jre/Contents/Home/bin/java"
 
       - name: Bundled JRE runs
         run: |
@@ -110,35 +139,76 @@ jobs:
         run: |
           set +e
           LOG="$RUNNER_TEMP/modelio-stdout.log"
-          "$APP/Contents/MacOS/modelio" -nosplash > "$LOG" 2>&1 &
+          "$APP/Contents/MacOS/modelio" -nosplash -consoleLog > "$LOG" 2>&1 &
           PID=$!
           echo "started pid $PID"
-          # give the OSGi runtime and UI time to come up
-          for i in $(seq 1 12); do
+
+          diagnostics() {
+            echo "==== diagnostics ===="
+            echo "---- processes ----"; ps -axo pid,ppid,etime,command | grep -i "[m]odelio\|[j]re/Contents/Home/bin/java" | cut -c1-220
+            echo "---- stdout/stderr ($(wc -l < "$LOG") lines) ----"; tail -80 "$LOG"
+            echo "---- ~/.modelio ----"; find "$HOME/.modelio" -maxdepth 4 2>/dev/null | head -40
+            for f in "$HOME"/.modelio/*/*.log "$HOME"/.modelio/*/*/data/.metadata/.log "$HOME"/.modelio/*/*/conf/*.log; do
+              [ -f "$f" ] && { echo "---- $f ----"; tail -80 "$f"; }
+            done
+            JPID="$(pgrep -f 'jre/Contents/Home/bin/java' | head -1)"
+            if [ -n "$JPID" ]; then
+              echo "---- sample of java pid $JPID (3s) ----"; sample "$JPID" 3 -file "$RUNNER_TEMP/sample.txt" > /dev/null 2>&1
+              head -120 "$RUNNER_TEMP/sample.txt" 2>/dev/null
+            fi
+          }
+
+          # wait up to 90 s for the process to die or for Modelio to report that it initialised
+          for i in $(seq 1 18); do
             sleep 5
             if ! kill -0 "$PID" 2>/dev/null; then
               echo "::error::Modelio exited after about $((i*5))s"
-              echo "---- stdout/stderr ----"; cat "$LOG"
-              for f in "$HOME"/.modelio/*/*/data/.metadata/.log "$HOME"/.modelio/*/*/conf/*.log; do
-                [ -f "$f" ] && { echo "---- $f ----"; tail -100 "$f"; }
-              done
+              diagnostics
               exit 1
             fi
+            # the OSGi session header (!SESSION ... java.version=...) is printed by -consoleLog once the framework
+            # is up; wait for it, because logback lines can appear before it
+            JV="$(grep -m1 '^java.version=' "$LOG" | cut -d= -f2)"
+            if [ -n "$JV" ] && [ -z "$JV_OK" ]; then
+              echo "application java.version=$JV"
+              case "$JV" in
+                11.*) JV_OK=1 ;;
+                *) echo "::error::The application ran on Java '$JV', not the bundled Java 11 (launcher did not use the bundled JRE)"
+                   diagnostics; kill "$PID" 2>/dev/null; exit 1 ;;
+              esac
+            fi
+            if [ -n "$JV_OK" ] && grep -qE "org\.modelio|logback" "$LOG"; then
+              echo "Modelio initialised after about $((i*5))s ($(grep -cE 'org\.modelio' "$LOG") org.modelio log lines)"
+              sleep 10   # let startup continue a little, then summarise what it did
+              echo "---- log summary: $(wc -l < "$LOG") lines, $(grep -ciE 'exception|error' "$LOG") mention exception/error ----"
+              echo "---- first 25 lines ----"; head -25 "$LOG" | cut -c1-200
+              echo "---- most frequent messages (numbers masked) ----"
+              sed -E 's/^[0-9:.,]+ *//; s/[0-9]+/N/g' "$LOG" | cut -c1-120 | sort | uniq -c | sort -rn | head -8
+              echo "---- last 25 lines ----"; tail -25 "$LOG" | cut -c1-200
+              echo "---- exception/error lines (first 10) ----"; grep -iE 'exception|error' "$LOG" | head -10 | cut -c1-220
+              if kill -0 "$PID" 2>/dev/null; then echo "process still alive after summary"; else echo "::warning::process exited during the extra 10 s"; fi
+              kill "$PID" 2>/dev/null
+              # the framework can come up while the application itself fails (unresolved bundles, missing natives)
+              if grep -qE '^!MESSAGE Application error|could not be found in the registry|UnsatisfiedLinkError' "$LOG"; then
+                echo "::error::Modelio logged an application error (see summary above)"
+                grep -nE -A6 '^!MESSAGE Application error|could not be found in the registry|UnsatisfiedLinkError' "$LOG" | head -30 | cut -c1-220
+                exit 1
+              fi
+              exit 0
+            fi
           done
-          echo "Modelio still running after 60s"
-          echo "---- stdout/stderr (tail) ----"; tail -50 "$LOG"
-          for f in "$HOME"/.modelio/*/*/data/.metadata/.log; do
-            [ -f "$f" ] && { echo "---- $f ----"; tail -50 "$f"; }
-          done
+          echo "::error::Process is alive but Modelio logged nothing in 90 s (JVM started, application did not initialise)"
+          diagnostics
           kill "$PID" 2>/dev/null
-          exit 0
+          exit 1
 
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-test-logs
+          name: smoke-test-logs-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/modelio-stdout.log
+            ${{ runner.temp }}/sample.txt
             ~/.modelio/**/*.log
           if-no-files-found: ignore
