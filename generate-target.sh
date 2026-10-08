@@ -18,6 +18,18 @@ BASE="$ECLIPSE_WS/dev-platform/rcp-target"
 RES="$ECLIPSE_WS/dev-platform/pack-resources"
 JRE_REPO="${RES}/openjdk-jre11"
 
+# Apple Silicon: the Eclipse 4.18 target has no macosx/aarch64 launcher. Eclipse 4.24 ships it (and its
+# SWT 3.120 is the one already used here). Only added with ARM64=1 so other builds stay offline/unchanged.
+ARM64_LOCATION=""
+if [ "${ARM64:-0}" = "1" ]; then
+    ARM64_LOCATION='		<location includeAllPlatforms="true" includeConfigurePhase="false" includeMode="slicer" includeSource="false" type="InstallableUnit">
+			<unit id="org.eclipse.equinox.executable.feature.group" version="3.8.1700.v20220509-0833"/>
+			<repository location="https://archive.eclipse.org/eclipse/updates/4.24/R-4.24-202206070700/"/>
+		</location>
+'
+    echo "ARM64=1: adding Eclipse 4.24 executable feature (macOS aarch64 launcher) from archive.eclipse.org"
+fi
+
 echo "Generating rcp.target with ECLIPSE_WS=$ECLIPSE_WS"
 
 cat > "$TARGET_FILE" <<EOF
@@ -56,7 +68,7 @@ cat > "$TARGET_FILE" <<EOF
 			<unit id="net.adoptium.temurin.jre.feature.feature.group" version="0.0.0"/>
 			<repository location="file:$JRE_REPO"/>
 		</location>
-	</locations>
+${ARM64_LOCATION}	</locations>
 </target>
 EOF
 

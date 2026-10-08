@@ -21,6 +21,7 @@
 #                                  # after a previous full build)
 #   ./build-mac.sh --offline       # mvn -o
 #   ./build-mac.sh --check-only    # only inspect an existing archive in products/target
+#   ./build-mac.sh --arm64         # Apple Silicon (macosx/cocoa/aarch64); fetches the Eclipse 4.24 launcher online
 # =============================================================================
 
 set -euo pipefail
@@ -31,11 +32,13 @@ cd "$REPO_ROOT"
 PRODUCTS_ONLY=0
 OFFLINE=0
 CHECK_ONLY=0
+ARM64=0
 for arg in "$@"; do
     case "$arg" in
         --products-only) PRODUCTS_ONLY=1 ;;
         --offline)       OFFLINE=1 ;;
         --check-only)    CHECK_ONLY=1 ;;
+        --arm64)         ARM64=1 ;;
         -h|--help)       sed -n 2,26p "$0"; exit 0 ;;
         *) echo "Unknown option: $arg"; exit 2 ;;
     esac
@@ -44,6 +47,13 @@ done
 DIST_DIR="$REPO_ROOT/dist"
 TARGET_FILE="dev-platform/rcp-target/rcp.target"
 MVN_PROFILES="platform.mac,product.org"
+ARCH_TAG="x86_64"
+if [ "$ARM64" -eq 1 ]; then
+    # Apple Silicon: aarch64 environment; generate-target.sh adds the Eclipse 4.24 launcher (needs internet)
+    MVN_PROFILES="platform.mac.arm,product.org"
+    ARCH_TAG="aarch64"
+    export ARM64=1
+fi
 
 check_archive() {
     local archive="$1"
@@ -78,7 +88,7 @@ check_archive() {
 }
 
 find_mac_archive() {
-    find "$REPO_ROOT/products/target" -type f \( -name '*macosx*cocoa*x86_64*.tar.gz' -o -name '*macosx*.tar.gz' \) 2>/dev/null | head -1
+    find "$REPO_ROOT/products/target" -type f -name "*macosx*cocoa*${ARCH_TAG}*.tar.gz" 2>/dev/null | head -1
 }
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
@@ -139,7 +149,7 @@ if [ -z "$ARCHIVE" ]; then
     exit 1
 fi
 mkdir -p "$DIST_DIR"
-OUT="$DIST_DIR/modelio-5.4.1-macosx-x86_64.tar.gz"
+OUT="$DIST_DIR/modelio-5.4.1-macosx-${ARCH_TAG}.tar.gz"
 cp -f "$ARCHIVE" "$OUT"
 ls -lh "$OUT"
 check_archive "$OUT" || true
