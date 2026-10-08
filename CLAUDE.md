@@ -36,7 +36,7 @@ Modelio/
 ├── modelio-web-api/            # Spring Boot 3.2 backend (Java 17)
 │   └── src/main/java/org/modelio/web/
 │       ├── config/             #   CORS, WebSocket (STOMP) configuration
-│       ├── controller/         #   REST controllers (6 controllers)
+│       ├── controller/         #   REST controllers (7 controllers)
 │       ├── dto/                #   JSON DTOs (ElementDto, DiagramDto, ModuleDto, etc.)
 │       └── service/            #   Business logic wrapping Modelio core APIs
 ├── modelio-web-ui/             # React 18 + TypeScript + Vite frontend
@@ -62,9 +62,36 @@ Modelio/
 # Full build (requires Eclipse target platform in dev-platform/)
 mvn clean install
 
-# Requires: Java 11, Maven 3.x, Tycho 2.2.0
+# Maven/Tycho 4.0.13 must RUN on JDK 17+; bundles compile for Java 8/11 via ~/.m2/toolchains.xml
+# (ids JavaSE-1.8 and JavaSE-11 -> a JDK 11, JavaSE-17 -> a JDK 17). Build fails without toolchains.
 # Note: Dependencies are resolved from MANIFEST.MF via P2, not pom.xml
 ```
+
+On CLI builds, `rcp.target` needs absolute paths — `build.cmd` wraps the whole flow:
+
+```bash
+export ECLIPSE_WS="C:/path/to/Modelio"
+./generate-target.sh                                 # writes dev-platform/rcp-target/rcp.target
+cd AGGREGATOR && mvn clean install -Dmaven.test.skip=true
+```
+
+`generate-target.sh` overwrites the tracked `rcp.target` with machine-specific paths (don't commit that). The reactor does not read `rcp.target` directly: `dev-platform/rcp-target` installs it as `org.modelio:rcp` into `~/.m2`, and every module resolves against that artifact — after regenerating the target, rebuild `dev-platform/rcp-target` too.
+
+There is no per-test command for the legacy build; tests are skipped in the CLI flow.
+
+### macOS product (cross-built on Linux/WSL)
+
+```bash
+bash setup-wsl.sh        # once, inside Ubuntu: JDK 17 + JDK 11, Maven, toolchains.xml, clone to ~/modelio
+./build-mac.sh           # generate target + Tycho -Pplatform.mac,product.org -> dist/modelio-*-macosx-x86_64.tar.gz
+./build-mac.sh --products-only   # re-run only rcp-target + products after a full build
+./build-mac.sh --check-only      # re-inspect an existing archive
+```
+
+- Intel (`macosx/cocoa/x86_64`) only; the Eclipse 4.18 target has no `macosx.aarch64` SWT. No signing, notarization or `.dmg` (needs macOS).
+- Build on the Linux filesystem (`~/modelio`), not `/mnt/c` (slow, loses exec bits/symlinks).
+- The bundled JRE is a prebuilt p2 repo (`dev-platform/pack-resources/openjdk-jre11`: `content.jar`, `artifacts.jar`, `.xz` copies and `binary/` root zips). Adding a platform means adding a root zip, a unit in `content.xml`, an artifact in `artifacts.xml` and regenerating the `.jar`/`.xz` copies. `generate-target.sh` must load it as an `InstallableUnit` p2 location — a `Directory` location silently drops the native root archives.
+- Empty directories listed in a bundle's `build.properties` `bin.includes` must contain a `.gitkeep`, otherwise Tycho packaging fails in a fresh clone.
 
 ### modelio-web-api (Spring Boot Backend)
 
@@ -121,6 +148,10 @@ cd modelio-web-ui && npm run dev
 # Open http://localhost:5173 in browser
 ```
 
+`run_back_end.cmd` / `run_front_end.cmd` at the repo root are Windows shortcuts for the two terminals.
+
+There are currently **no tests** in `modelio-web-api/src/test` or `modelio-web-ui`, and no ESLint config exists, so `npm run lint` / `npm run test` / `npm run test:e2e` will not do anything useful until those are added. `npm run build` (`tsc -b && vite build`) is the effective type-check.
+
 ---
 
 ## Key Concepts
@@ -156,9 +187,10 @@ BPMN: SubProcess, ProcessDesign, ProcessCollaboration
 
 | Endpoint Group | Base Path | Controller |
 |---|---|---|
-| Projects | `GET /api/projects` | `ProjectController` |
+| Workspaces (projects) | `/api/workspaces` (+ `/{name}/open`, `/current/{close,status,save}`) | `WorkspaceController` |
+| Environment | `/api/env/preferences[/{key}]` | `EnvironmentController` |
 | Elements | `GET/POST/PUT/DELETE /api/elements` | `ElementController` |
-| Diagrams | `GET/PUT /api/diagrams/{id}/layout` | `DiagramController` |
+| Diagrams | `GET /api/diagrams/{id}`, `GET/PUT .../layout`, `GET .../export` | `DiagramController` |
 | Transactions | `POST /api/transactions` + `/commit`, `/rollback`, `/undo`, `/redo` | `TransactionController` |
 | JMDAC Modules | `GET/POST/DELETE /api/modules` + `/start`, `/stop`, `/contributions`, `/actions`, `/commands` | `ModuleController` |
 | Import/Export | `POST /api/import/xmi`, `GET /api/export/xmi`, BPMN equivalents | `ImportExportController` |
@@ -168,27 +200,20 @@ BPMN: SubProcess, ProcessDesign, ProcessCollaboration
 
 ---
 
-## Migration Status
+## Migration Status — How the Backend Actually Works
 
-Service methods in `ModelioSessionService` and `ModuleService` contain **TODO markers** with exact Modelio API mapping comments. They are stubs awaiting core JAR integration.
+The backend does **not yet use the Modelio core JARs** (the `org.modelio:*` dependency blocks in `modelio-web-api/pom.xml` are commented out). Instead it works directly on Modelio's on-disk project format:
 
-**Blocked on:** Extracting Modelio core modules from Tycho build into standard Maven JARs. The procedure is:
+- `ExmlService` parses/writes `.exml` model files with the JDK DOM API (no SmKernel/`ICoreSession`). Element IDs are the EXML `uid`; the metaclass comes from the `mc` attribute (e.g. `Standard.Package`). Diagram layout (Gm*) is read from the diagram XML.
+- `WorkspaceService` owns project lifecycle: it locates `project.conf` (new layout `{root}/{name}/project.conf`, flat layout, or one subfolder deep for existing Modelio projects), creates/opens/closes/saves/deletes projects, and unpacks fragments/modules from `runtime/fragments`.
+- `ModelioSessionService` sits on top of the two above and implements the element/diagram/transaction API (transactions are an in-memory map, not a real `ITransaction`).
+- `ModelioEnv` replicates `org.modelio.platform.core.ModelioEnv` (`~/.modelio-web/5.4/` env folder, module catalog, `preferences.properties`).
+- `ModuleService`, `ImportExportController`, and parts of `ModelioSessionService`/`WorkspaceService` are still stubs with `TODO` comments giving the exact Modelio API to call once the core JARs are available.
+- All paths come from `modelio.*` keys in `application.yml` (env path, module catalog, workspace root `~/modelio-workspace`). CORS is locked to `http://localhost:5173`.
 
-```bash
-# 1. Build legacy Modelio with Tycho
-cd /path/to/Modelio && mvn clean install
+Frontend data flow: `services/api.ts` (REST) and `services/websocket.ts` (STOMP `/ws`, `/topic/model.events`) → Zustand stores (`appStore.ts` for project/selection/explorer, `diagramStore.ts` for diagram state) → components. Diagrams render with `@xyflow/react` (custom `nodes/` and `edges/`, `dagre` auto-layout); `demoData.ts` backs the "Open Demo Class Diagram" button. Vite proxies `/api` and `/icons` to :8080; icons are served from the backend's `static/icons`.
 
-# 2. Install each core JAR into local Maven repo
-mvn install:install-file \
-  -Dfile=modelio/core/core.kernel/target/org.modelio.core.kernel-5.4.1.jar \
-  -DgroupId=org.modelio -DartifactId=core.kernel \
-  -Dversion=5.4.1 -Dpackaging=jar
-
-# Repeat for: core.metamodel.api, core.metamodel.impl, core.session,
-#             core.store.exml, core.project, platform.mda.infra
-```
-
-Then uncomment the Modelio dependency blocks in `modelio-web-api/pom.xml`.
+To switch the backend to the real core, build the legacy tree then run `./install-core-jars.sh` (installs the core, UML/BPMN metamodel, platform and `app.diagram.*` Gm* JARs as `org.modelio:*:5.4.1` into `~/.m2`; JARs are taken from each module's `target/`), then uncomment the dependency blocks in the web-api `pom.xml`.
 
 ---
 
@@ -214,7 +239,7 @@ Then uncomment the Modelio dependency blocks in `modelio-web-api/pom.xml`.
 
 ### Legacy Java (modelio/)
 
-- Java 11, Eclipse RCP conventions
+- Bundles target Java 11 (some Java 8 BREEs), Eclipse RCP conventions
 - OSGi bundles with `MANIFEST.MF` dependency declarations
 - Tycho build with `eclipse-plugin` packaging
 - E4 dependency injection (`@Inject`, `@PostConstruct`)

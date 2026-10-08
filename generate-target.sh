@@ -16,6 +16,7 @@ ECLIPSE_WS="${ECLIPSE_WS:-$(cd "$(dirname "$0")" && pwd -W 2>/dev/null || pwd)}"
 TARGET_FILE="$(dirname "$0")/dev-platform/rcp-target/rcp.target"
 BASE="$ECLIPSE_WS/dev-platform/rcp-target"
 RES="$ECLIPSE_WS/dev-platform/pack-resources"
+JRE_REPO="${RES}/openjdk-jre11"
 
 echo "Generating rcp.target with ECLIPSE_WS=$ECLIPSE_WS"
 
@@ -49,7 +50,12 @@ cat > "$TARGET_FILE" <<EOF
 		<location path="$BASE/tmatesoft/svnkit-1.10.9" type="Directory"/>
 		<location path="$BASE/org.slf4j/slf4j" type="Directory"/>
 		<location path="$BASE/ch.qos/logback" type="Directory"/>
-		<location path="$RES/openjdk-jre11" type="Directory"/>
+	<!-- p2 repository (not "Directory"): the native JRE lives in root artifacts (binary/) that
+	     only p2 metadata describes; a Directory location sees only features/ and plugins/. -->
+		<location includeAllPlatforms="true" includeConfigurePhase="false" includeMode="slicer" includeSource="false" type="InstallableUnit">
+			<unit id="net.adoptium.temurin.jre.feature.feature.group" version="0.0.0"/>
+			<repository location="file:$JRE_REPO"/>
+		</location>
 	</locations>
 </target>
 EOF
