@@ -401,6 +401,16 @@
          fragment="true"/>
 
    <plugin
+         id="org.eclipse.equinox.launcher.cocoa.macosx.aarch64"
+         os="macosx"
+         ws="cocoa"
+         arch="aarch64"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         fragment="true"/>
+
+   <plugin
          id="org.eclipse.equinox.launcher.gtk.linux.ppc64le"
          os="linux"
          ws="gtk"
@@ -491,6 +501,16 @@
          version="3.115.100.v20201202-1103"
          fragment="true"
          unpack="false"/>
+
+   <plugin
+         id="org.eclipse.swt.cocoa.macosx.aarch64"
+         os="macosx"
+         ws="cocoa"
+         arch="aarch64"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         fragment="true"/>
 
    <plugin
          id="org.eclipse.swt.browser.chromium.gtk.linux.x86_64"
