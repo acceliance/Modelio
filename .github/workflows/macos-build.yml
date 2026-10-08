@@ -139,28 +139,43 @@ jobs:
         run: |
           set +e
           LOG="$RUNNER_TEMP/modelio-stdout.log"
-          "$APP/Contents/MacOS/modelio" -nosplash > "$LOG" 2>&1 &
+          "$APP/Contents/MacOS/modelio" -nosplash -consoleLog > "$LOG" 2>&1 &
           PID=$!
           echo "started pid $PID"
-          # give the OSGi runtime and UI time to come up
-          for i in $(seq 1 12); do
+
+          diagnostics() {
+            echo "==== diagnostics ===="
+            echo "---- processes ----"; ps -axo pid,ppid,etime,command | grep -i "[m]odelio\|[j]re/Contents/Home/bin/java" | cut -c1-220
+            echo "---- stdout/stderr ($(wc -l < "$LOG") lines) ----"; tail -80 "$LOG"
+            echo "---- ~/.modelio ----"; find "$HOME/.modelio" -maxdepth 4 2>/dev/null | head -40
+            for f in "$HOME"/.modelio/*/*.log "$HOME"/.modelio/*/*/data/.metadata/.log "$HOME"/.modelio/*/*/conf/*.log; do
+              [ -f "$f" ] && { echo "---- $f ----"; tail -80 "$f"; }
+            done
+            JPID="$(pgrep -f 'jre/Contents/Home/bin/java' | head -1)"
+            if [ -n "$JPID" ]; then
+              echo "---- sample of java pid $JPID (3s) ----"; sample "$JPID" 3 -file "$RUNNER_TEMP/sample.txt" > /dev/null 2>&1
+              head -120 "$RUNNER_TEMP/sample.txt" 2>/dev/null
+            fi
+          }
+
+          # wait up to 90 s for the process to die or for Modelio to report that it initialised
+          for i in $(seq 1 18); do
             sleep 5
             if ! kill -0 "$PID" 2>/dev/null; then
               echo "::error::Modelio exited after about $((i*5))s"
-              echo "---- stdout/stderr ----"; cat "$LOG"
-              for f in "$HOME"/.modelio/*/*/data/.metadata/.log "$HOME"/.modelio/*/*/conf/*.log; do
-                [ -f "$f" ] && { echo "---- $f ----"; tail -100 "$f"; }
-              done
+              diagnostics
               exit 1
             fi
+            if grep -qE "org\.modelio|logback" "$LOG"; then
+              echo "Modelio initialised after about $((i*5))s ($(grep -cE 'org\.modelio' "$LOG") org.modelio log lines)"
+              kill "$PID" 2>/dev/null
+              exit 0
+            fi
           done
-          echo "Modelio still running after 60s"
-          echo "---- stdout/stderr (tail) ----"; tail -50 "$LOG"
-          for f in "$HOME"/.modelio/*/*/data/.metadata/.log; do
-            [ -f "$f" ] && { echo "---- $f ----"; tail -50 "$f"; }
-          done
+          echo "::error::Process is alive but Modelio logged nothing in 90 s (JVM started, application did not initialise)"
+          diagnostics
           kill "$PID" 2>/dev/null
-          exit 0
+          exit 1
 
       - name: Upload logs on failure
         if: failure()
@@ -169,5 +184,6 @@ jobs:
           name: smoke-test-logs-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/modelio-stdout.log
+            ${{ runner.temp }}/sample.txt
             ~/.modelio/**/*.log
           if-no-files-found: ignore
