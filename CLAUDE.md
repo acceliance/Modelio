@@ -79,19 +79,37 @@ cd AGGREGATOR && mvn clean install -Dmaven.test.skip=true
 
 There is no per-test command for the legacy build; tests are skipped in the CLI flow.
 
-### macOS product (cross-built on Linux/WSL)
+### macOS products (cross-built on Linux/WSL)
 
 ```bash
-bash setup-wsl.sh        # once, inside Ubuntu: JDK 17 + JDK 11, Maven, toolchains.xml, clone to ~/modelio
-./build-mac.sh           # generate target + Tycho -Pplatform.mac,product.org -> dist/modelio-*-macosx-x86_64.tar.gz
-./build-mac.sh --products-only   # re-run only rcp-target + products after a full build
-./build-mac.sh --check-only      # re-inspect an existing archive
+bash setup-wsl.sh                # once, inside Ubuntu: JDK 17 + JDK 11, Maven, toolchains.xml, clone to ~/modelio
+./build-mac.sh                   # Intel: generate target + Tycho -Pplatform.mac,product.org -> dist/modelio-*-macosx-x86_64.tar.gz
+./build-mac.sh --arm64           # Apple Silicon (-Pplatform.mac.arm) -> dist/modelio-*-macosx-aarch64.tar.gz
+./build-mac.sh --products-only   # re-run only rcp-target + products after a full build (combine with --arm64)
+./build-mac.sh --check-only      # re-inspect the finished archive in dist/ (combine with --arm64)
 ```
 
-- Intel (`macosx/cocoa/x86_64`) only; the Eclipse 4.18 target has no `macosx.aarch64` SWT. No signing, notarization or `.dmg` (needs macOS).
+- Both `macosx/cocoa/x86_64` and `macosx/cocoa/aarch64` are built. No signing, notarization or `.dmg` (needs macOS). Apple Silicon has no `astyle` (no arm64 native) and no Chromium browser fragment (SWT falls back to the system WebKit).
 - Build on the Linux filesystem (`~/modelio`), not `/mnt/c` (slow, loses exec bits/symlinks).
-- The bundled JRE is a prebuilt p2 repo (`dev-platform/pack-resources/openjdk-jre11`: `content.jar`, `artifacts.jar`, `.xz` copies and `binary/` root zips). Adding a platform means adding a root zip, a unit in `content.xml`, an artifact in `artifacts.xml` and regenerating the `.jar`/`.xz` copies. `generate-target.sh` must load it as an `InstallableUnit` p2 location — a `Directory` location silently drops the native root archives.
+- **Bundled JRE**: a prebuilt p2 repo (`dev-platform/pack-resources/openjdk-jre11`: `content.jar`, `artifacts.jar`, `.xz` copies and `binary/` root zips). Adding a platform means adding a root zip, a unit in `content.xml`, an artifact in `artifacts.xml` and regenerating the `.jar`/`.xz` copies. `generate-target.sh` must load it as an `InstallableUnit` p2 location — a `Directory` location silently drops the native root archives.
+- **macOS launcher and JRE**: the launcher resolves paths relative to `Contents/MacOS` and only looks for `jre/` there, but the JRE lives in `Contents/Eclipse/jre`. Without the explicit `-vm ../Eclipse/jre/Contents/Home/bin/java` (`programArgsMac` in `products/modelio-os.product`) it silently falls back to any installed Java; CI asserts the app reports `java.version=11.*`.
+- **Apple Silicon needs Eclipse 4.24 pieces** that the 4.18 target lacks, vendored in `dev-platform/rcp-target/rcp-eclipse/eclipse-aarch64/` (launcher fragment, `core.filesystem.macosx`/`equinox.security.macosx` with aarch64 in their platform filter, JNA 5.8.0 which has `darwin-aarch64`; see its README). `org.modelio.platform.feature`, `org.modelio.e4.rcp` and the vendored `p2.core.feature` (patched, signature removed) list them per architecture. Tycho cannot build the aarch64 native launcher from the 4.18 target, so `build-mac.sh --arm64` adds `Contents/MacOS/modelio`, `Info.plist` and the icon to the archive afterwards (`products/macos-aarch64/README.txt`).
+- Tycho drops an *unsatisfiable optional* feature include silently (e.g. `p2.user.ui`, which took the `dropins` bundle with it on aarch64); when a bundle "could not be found" in the product, compare the unit lists of two `products/target/targetPlatformRepository/content.xml`.
+- OSGi resolution does not depend on the host CPU: run the equinox launcher jar of an extracted macOS product on the Linux JDK with `-os macosx -ws cocoa -arch aarch64 -consoleLog -install <Contents/Eclipse> -configuration <copy of configuration/>` to list unresolved bundles in seconds (it ends at loading the macOS SWT library, which is expected).
+- A feature that names a plugin missing from the target fails packaging for **every** platform, even if the entry has an `arch`/`os` filter.
 - Empty directories listed in a bundle's `build.properties` `bin.includes` must contain a `.gitkeep`, otherwise Tycho packaging fails in a fresh clone.
+- CI (`.github/workflows/macos-build.yml`) builds both on Linux and smoke-tests them on `macos-15-intel` and `macos-latest` (arm64): the app must start on the bundled Java 11, print Modelio startup output and log no application error. This proves the app starts, not that the UI works — nothing is clicked.
+
+### Linux and Windows products
+
+```bash
+# after generate-target.sh; archives land in products/target/products/ (mvn clean wipes the previous one)
+cd AGGREGATOR && mvn clean install -Dmaven.test.skip=true -Pplatform.linux,product.org   # *.linux.gtk.x86_64.tar.gz
+cd products   && mvn clean install -Dmaven.test.skip=true -Pplatform.win,product.org     # *.win32.win32.x86_64.zip (cross-built)
+```
+
+- **Linux runtime needs GTK 3 and `libwebkit2gtk-4.0-37`** (SWT 3.120's embedded browser). Verified: on Ubuntu 22.04 with it the app starts cleanly with the WebKit processes in use; on Ubuntu 26.04, which no longer ships WebKitGTK 4.0, the app starts but the Welcome and project info views fail with `SWTError: No more handles because there is no underlying browser available`. Using Chromium (`-Dorg.eclipse.swt.browser.DefaultType=chromium`) did not help (its fragment is 3.115 vs SWT core 3.120). Newer SWT would support WebKitGTK 4.1 but means leaving the Eclipse 4.18 target.
+- Do not delete every `target/` folder: ~460 tracked files live under `dev-platform/rcp-target/**/target/` (the committed p2 repositories). Clean with `git clean -fdX` (ignored files only).
 
 ### modelio-web-api (Spring Boot Backend)
 
