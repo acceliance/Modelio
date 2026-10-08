@@ -166,14 +166,18 @@ jobs:
               diagnostics
               exit 1
             fi
-            if grep -qE "org\.modelio|logback" "$LOG"; then
-              JV="$(grep -m1 '^java.version=' "$LOG" | cut -d= -f2)"
+            # the OSGi session header (!SESSION ... java.version=...) is printed by -consoleLog once the framework
+            # is up; wait for it, because logback lines can appear before it
+            JV="$(grep -m1 '^java.version=' "$LOG" | cut -d= -f2)"
+            if [ -n "$JV" ] && [ -z "$JV_OK" ]; then
               echo "application java.version=$JV"
               case "$JV" in
-                11.*) ;;
+                11.*) JV_OK=1 ;;
                 *) echo "::error::The application ran on Java '$JV', not the bundled Java 11 (launcher did not use the bundled JRE)"
                    diagnostics; kill "$PID" 2>/dev/null; exit 1 ;;
               esac
+            fi
+            if [ -n "$JV_OK" ] && grep -qE "org\.modelio|logback" "$LOG"; then
               echo "Modelio initialised after about $((i*5))s ($(grep -cE 'org\.modelio' "$LOG") org.modelio log lines)"
               sleep 10   # let startup continue a little, then summarise what it did
               echo "---- log summary: $(wc -l < "$LOG") lines, $(grep -ciE 'exception|error' "$LOG") mention exception/error ----"
@@ -184,6 +188,12 @@ jobs:
               echo "---- exception/error lines (first 10) ----"; grep -iE 'exception|error' "$LOG" | head -10 | cut -c1-220
               if kill -0 "$PID" 2>/dev/null; then echo "process still alive after summary"; else echo "::warning::process exited during the extra 10 s"; fi
               kill "$PID" 2>/dev/null
+              # the framework can come up while the application itself fails (unresolved bundles, missing natives)
+              if grep -qE '^!MESSAGE Application error|could not be found in the registry|UnsatisfiedLinkError' "$LOG"; then
+                echo "::error::Modelio logged an application error (see summary above)"
+                grep -nE -A6 '^!MESSAGE Application error|could not be found in the registry|UnsatisfiedLinkError' "$LOG" | head -30 | cut -c1-220
+                exit 1
+              fi
               exit 0
             fi
           done
