@@ -274,12 +274,39 @@ jobs:
           kill "$PID" 2>/dev/null
           exit 1
 
+      # A double-click starts the app through LaunchServices (no shell PATH/JAVA_HOME), which is what a user does.
+      - name: Launch like a double-click (open)
+        run: |
+          pkill -f "Contents/MacOS/modelio" 2>/dev/null; sleep 3
+          rm -rf "$HOME/.modelio"
+          open "$APP"
+          OK=0; LOGF=""
+          for i in $(seq 1 24); do
+            sleep 5
+            LOGF="$(ls "$HOME"/.modelio/5.4/modelio-*.log 2>/dev/null | head -1 || true)"
+            if [ -n "$LOGF" ] && grep -q "Changing workspace to" "$LOGF"; then OK=1; echo "reached the workspace stage after about $((i*5))s"; break; fi
+          done
+          echo "log file: $LOGF"
+          echo "---- Modelio processes:"; ps -axo pid,etime,args | grep -E "[C]ontents/MacOS/modelio|[j]re/Contents/Home/bin/java" | cut -c1-200
+          sleep 15
+          screencapture -x "$RUNNER_TEMP/screenshot-open-${{ matrix.arch }}.png" 2>&1 || echo "screencapture failed"
+          [ -n "$LOGF" ] && { echo "---- log tail:"; tail -15 "$LOGF" | cut -c1-180; }
+          if [ "$OK" != 1 ]; then echo "::error::launched with open: the app did not reach the workspace stage"; exit 1; fi
+          if ! ps -axo args | grep -q "[M]odelio 5.4.1.app/Contents/Eclipse/jre/Contents/Home/bin/java"; then
+            echo "::error::launched with open: not running on the bundled JRE"; ps -axo args | grep "[b]in/java" | cut -c1-200; exit 1
+          fi
+          if grep -qE "Application error|could not be found in the registry|UnsatisfiedLinkError" "$LOGF"; then
+            echo "::error::launched with open: application error in the log"; grep -nE -A4 "Application error|UnsatisfiedLinkError" "$LOGF" | head -20; exit 1
+          fi
+          echo "OK: started with open, on the bundled JRE, no application error"
+          pkill -f "Contents/MacOS/modelio" 2>/dev/null || true
+
       - name: Upload screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshot-${{ matrix.arch }}
-          path: ${{ runner.temp }}/screenshot-${{ matrix.arch }}.png
+          path: ${{ runner.temp }}/screenshot-*.png
           if-no-files-found: ignore
           retention-days: 14
 
