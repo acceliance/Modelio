@@ -8,3 +8,12 @@ fragments have a platform filter limited to x86_64 (aarch64 support was added in
 
 The native "eclipse" executable root (org.eclipse.equinox.executable feature 3.8.1700) is not vendored: generate-target.sh fetches it
 from the same repository when ARM64=1.
+
+PATCHED FEATURE (in ../eclipse/features/):
+  org.eclipse.equinox.p2.core.feature_1.6.800.v20201106-1246 (folder and .jar)
+  Its org.eclipse.equinox.security.macosx entry is split by architecture: x86_64 keeps 1.101.200, aarch64
+  uses 1.101.400 (from this directory). Without this the 4.18 feature requires 1.101.200, whose platform
+  filter excludes aarch64, so the whole p2 feature chain (p2.core/extras/rcp/user.ui, reached through the
+  optional include in org.modelio.platform.feature) became unsatisfiable on aarch64 and was silently dropped,
+  taking org.eclipse.equinox.p2.reconciler.dropins with it. The Eclipse signature files and manifest digests were
+  removed because the content changed.
