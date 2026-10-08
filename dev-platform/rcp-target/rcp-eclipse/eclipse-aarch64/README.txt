@@ -3,6 +3,7 @@ that the Eclipse 4.18 target platform lacks for Apple Silicon: the 4.18 versions
 fragments have a platform filter limited to x86_64 (aarch64 support was added in later releases).
 
   org.eclipse.core.filesystem.macosx_1.3.300.v20210427-1937.jar
+  com.sun.jna_5.8.0.v20210503-0343.jar, com.sun.jna.platform_5.8.0.v20210406-1004.jar   (JNA 4.5.1 has no darwin-aarch64 native)
   org.eclipse.equinox.launcher.cocoa.macosx.aarch64_1.2.500.v20220509-0833.jar   (aarch64 native launcher library)
   org.eclipse.equinox.security.macosx_1.101.400.v20210427-1958.jar
 

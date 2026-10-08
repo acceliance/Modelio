@@ -678,4 +678,25 @@
          version="4.5.1.v20190425-1842"
          unpack="false"/>
 
+   <!-- Apple Silicon: JNA 4.5.1 has no darwin-aarch64 native, so it cannot resolve there and takes the whole UI
+        stack with it. JNA 5.8.0 (from Eclipse 4.24, vendored in dev-platform/rcp-target/rcp-eclipse/eclipse-aarch64)
+        has it; the resolver prefers the higher version. -->
+   <plugin
+         id="com.sun.jna"
+         os="macosx"
+         arch="aarch64"
+         download-size="1725"
+         install-size="3897"
+         version="5.8.0.v20210503-0343"
+         unpack="false"/>
+
+   <plugin
+         id="com.sun.jna.platform"
+         os="macosx"
+         arch="aarch64"
+         download-size="1444"
+         install-size="2368"
+         version="5.8.0.v20210406-1004"
+         unpack="false"/>
+
 </feature>
