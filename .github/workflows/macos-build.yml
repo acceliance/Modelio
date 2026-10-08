@@ -1,0 +1,132 @@
+name: macOS build
+
+# Cross-builds the macOS (cocoa/x86_64) product with Tycho on Linux, then smoke-tests
+# the archive on a macOS runner (extract, clear quarantine, start the app, check it stays up).
+# Not covered: signing, notarization, .dmg, Apple Silicon, any real UI interaction.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'products/**'
+      - 'dev-platform/pack-resources/**'
+      - 'generate-target.sh'
+      - 'build-mac.sh'
+      - 'setup-wsl.sh'
+      - '.github/workflows/macos-build.yml'
+
+concurrency:
+  group: macos-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build macOS product (Linux runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tycho 4.0.x runs on JDK 17+; bundles compile for Java 8/11 through toolchains.
+      # The last java-version listed becomes the default JAVA_HOME (17).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            11
+            17
+
+      - name: Maven toolchains
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/toolchains.xml <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <toolchains>
+            <toolchain><type>jdk</type><provides><id>JavaSE-1.8</id><version>11</version><vendor>Temurin</vendor></provides><configuration><jdkHome>${JAVA_HOME_11_X64}</jdkHome></configuration></toolchain>
+            <toolchain><type>jdk</type><provides><id>JavaSE-11</id><version>11</version><vendor>Temurin</vendor></provides><configuration><jdkHome>${JAVA_HOME_11_X64}</jdkHome></configuration></toolchain>
+            <toolchain><type>jdk</type><provides><id>JavaSE-17</id><version>17</version><vendor>Temurin</vendor></provides><configuration><jdkHome>${JAVA_HOME_17_X64}</jdkHome></configuration></toolchain>
+          </toolchains>
+          EOF
+          java -version
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml', '**/MANIFEST.MF') }}
+          restore-keys: m2-${{ runner.os }}-
+
+      - name: Build
+        run: |
+          chmod +x build-mac.sh generate-target.sh
+          ./build-mac.sh
+
+      - name: Archive sanity check
+        run: ./build-mac.sh --check-only
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelio-macosx-x86_64
+          path: dist/modelio-*-macosx-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  smoke-test:
+    name: Smoke test (macOS runner)
+    needs: build
+    # Intel runner: the product is x86_64. If this label is unavailable for your account/plan,
+    # switch to macos-latest (Apple Silicon) and make sure Rosetta 2 is installed.
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: modelio-macosx-x86_64
+
+      - name: Extract and clear quarantine
+        run: |
+          tar xzf modelio-*-macosx-x86_64.tar.gz
+          APP="$(ls -d *.app | head -1)"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          xattr -dr com.apple.quarantine "$APP" || true
+          ls -l "$APP/Contents/MacOS" "$APP/Contents/Eclipse" | head -30
+
+      - name: Bundled JRE runs
+        run: |
+          "$APP/Contents/Eclipse/jre/Contents/Home/bin/java" -version
+
+      - name: Start the application
+        run: |
+          set +e
+          LOG="$RUNNER_TEMP/modelio-stdout.log"
+          "$APP/Contents/MacOS/modelio" -nosplash > "$LOG" 2>&1 &
+          PID=$!
+          echo "started pid $PID"
+          # give the OSGi runtime and UI time to come up
+          for i in $(seq 1 12); do
+            sleep 5
+            if ! kill -0 "$PID" 2>/dev/null; then
+              echo "::error::Modelio exited after about $((i*5))s"
+              echo "---- stdout/stderr ----"; cat "$LOG"
+              for f in "$HOME"/.modelio/*/*/data/.metadata/.log "$HOME"/.modelio/*/*/conf/*.log; do
+                [ -f "$f" ] && { echo "---- $f ----"; tail -100 "$f"; }
+              done
+              exit 1
+            fi
+          done
+          echo "Modelio still running after 60s"
+          echo "---- stdout/stderr (tail) ----"; tail -50 "$LOG"
+          for f in "$HOME"/.modelio/*/*/data/.metadata/.log; do
+            [ -f "$f" ] && { echo "---- $f ----"; tail -50 "$f"; }
+          done
+          kill "$PID" 2>/dev/null
+          exit 0
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs
+          path: |
+            ${{ runner.temp }}/modelio-stdout.log
+            ~/.modelio/**/*.log
+          if-no-files-found: ignore
