@@ -125,7 +125,9 @@ find_mac_archive() {
 }
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
-    ARCHIVE="$(find_mac_archive)"
+    # prefer the finished archive in dist/ (for aarch64 it has the launcher added after the Tycho build)
+    ARCHIVE="$DIST_DIR/modelio-5.4.1-macosx-${ARCH_TAG}.tar.gz"
+    [ -f "$ARCHIVE" ] || ARCHIVE="$(find_mac_archive)"
     [ -z "$ARCHIVE" ] && { echo "No macOS archive found under products/target"; exit 1; }
     check_archive "$ARCHIVE"
     exit $?

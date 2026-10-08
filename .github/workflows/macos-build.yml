@@ -1,8 +1,8 @@
 name: macOS build
 
-# Cross-builds the macOS (cocoa/x86_64) product with Tycho on Linux, then smoke-tests
-# the archive on a macOS runner (extract, clear quarantine, start the app, check it stays up).
-# Not covered: signing, notarization, .dmg, Apple Silicon, any real UI interaction.
+# Cross-builds the macOS products (Intel x86_64 and Apple Silicon aarch64) with Tycho on Linux, then smoke-tests
+# each archive on a matching macOS runner (extract, clear quarantine, start the app, check it stays up).
+# Not covered: signing, notarization, .dmg, any real UI interaction.
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build macOS product (Linux runner)
+    name: Build macOS products (Linux runner)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -67,13 +67,21 @@ jobs:
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml', '**/MANIFEST.MF') }}
           restore-keys: m2-${{ runner.os }}-
 
-      - name: Build
+      - name: Build Intel (x86_64)
         run: |
           chmod +x build-mac.sh generate-target.sh
           ./build-mac.sh
 
-      - name: Archive sanity check
+      - name: Intel archive sanity check
         run: ./build-mac.sh --check-only
+
+      # The features were installed into ~/.m2 by the full Intel build above and already contain the
+      # aarch64 entries, so only the target definition and the products module are rebuilt.
+      - name: Build Apple Silicon (aarch64)
+        run: ./build-mac.sh --arm64 --products-only
+
+      - name: Apple Silicon archive sanity check
+        run: ./build-mac.sh --arm64 --check-only
 
       - uses: actions/upload-artifact@v4
         with:
@@ -82,25 +90,46 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelio-macosx-aarch64
+          path: dist/modelio-*-macosx-aarch64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
   smoke-test:
-    name: Smoke test (macOS runner)
+    name: Smoke test (${{ matrix.arch }})
     needs: build
-    # Intel runner: the product is x86_64. If this label is unavailable for your account/plan,
-    # switch to macos-latest (Apple Silicon) and make sure Rosetta 2 is installed.
-    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Intel runner for the x86_64 product. If this label is unavailable for your account/plan,
+          # use macos-latest (Apple Silicon) with Rosetta 2 installed.
+          - arch: x86_64
+            runner: macos-15-intel
+          # Apple Silicon runner for the native aarch64 product.
+          - arch: aarch64
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: modelio-macosx-x86_64
+          name: modelio-macosx-${{ matrix.arch }}
 
       - name: Extract and clear quarantine
         run: |
-          tar xzf modelio-*-macosx-x86_64.tar.gz
+          echo "runner arch: $(uname -m)"
+          tar xzf modelio-*-macosx-${{ matrix.arch }}.tar.gz
           APP="$(ls -d *.app | head -1)"
           echo "APP=$APP" >> "$GITHUB_ENV"
           xattr -dr com.apple.quarantine "$APP" || true
           ls -l "$APP/Contents/MacOS" "$APP/Contents/Eclipse" | head -30
+
+      - name: Binary architectures
+        run: |
+          file "$APP/Contents/MacOS/modelio" "$APP/Contents/Eclipse/jre/Contents/Home/bin/java"
 
       - name: Bundled JRE runs
         run: |
@@ -137,7 +166,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-test-logs
+          name: smoke-test-logs-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/modelio-stdout.log
             ~/.modelio/**/*.log
