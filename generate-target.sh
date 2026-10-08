@@ -24,6 +24,9 @@ ARM64_LOCATION=""
 if [ "${ARM64:-0}" = "1" ]; then
     ARM64_LOCATION='		<location includeAllPlatforms="true" includeConfigurePhase="false" includeMode="slicer" includeSource="false" type="InstallableUnit">
 			<unit id="org.eclipse.equinox.executable.feature.group" version="3.8.1700.v20220509-0833"/>
+			<unit id="org.eclipse.equinox.launcher.cocoa.macosx.aarch64" version="1.2.500.v20220509-0833"/>
+			<unit id="org.eclipse.equinox.executable_root.cocoa.macosx.aarch64" version="3.8.1700.v20220509-0833"/>
+			<unit id="org.eclipse.rcp.configuration_root.cocoa.macosx.aarch64" version="1.1.1700.v20220607-0700"/>
 			<repository location="https://archive.eclipse.org/eclipse/updates/4.24/R-4.24-202206070700/"/>
 		</location>
 '
