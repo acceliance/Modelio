@@ -87,7 +87,11 @@ ditto "$APP_SRC" "$DEST"
 detach
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 echo "installed: $DEST"
-if codesign --verify --strict "$DEST" 2>/dev/null; then echo "signature seal: valid (ad-hoc)"; else echo "WARNING: signature seal is NOT valid (was the bundle modified?). Re-sign: codesign --force --deep --sign - \"$DEST\""; fi
+if codesign --verify --strict "$DEST" 2>/dev/null; then
+    SIGDESC="$(codesign -dv "$DEST" 2>&1 | grep -E '^(Authority=Developer ID Application|Signature=adhoc)' | head -1 | sed -E 's/^Signature=adhoc/ad-hoc/; s/^Authority=//' || true)"
+    echo "signature seal: valid (${SIGDESC:-signed})"
+    if xcrun stapler validate "$DEST" >/dev/null 2>&1; then echo "notarization ticket: stapled"; fi
+else echo "WARNING: signature seal is NOT valid (was the bundle modified?). Re-sign: codesign --force --deep --sign - \"$DEST\""; fi
 
 # --- launch ------------------------------------------------------------------------------------------------------
 if [ "$LAUNCH" = 1 ]; then

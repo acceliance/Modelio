@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the hardened runtime (required for notarization). A Java/Eclipse app needs:
+    allow-jit                        the JVM's JIT compiler maps writable+executable memory
+    allow-unsigned-executable-memory  same family: JVM code cache / generated code
+    disable-library-validation       SWT and JNA load native libraries they extract at run time into ~/.swt and a temp
+                                     folder, and the bundled JRE/libraries may be signed by another team
+  Applied to the main executable and to executables inside the app; plain libraries need none.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

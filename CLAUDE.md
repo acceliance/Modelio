@@ -99,6 +99,7 @@ bash setup-wsl.sh                # once, inside Ubuntu: JDK 17 + JDK 11, Maven, 
 - A feature that names a plugin missing from the target fails packaging for **every** platform, even if the entry has an `arch`/`os` filter.
 - Empty directories listed in a bundle's `build.properties` `bin.includes` must contain a `.gitkeep`, otherwise Tycho packaging fails in a fresh clone.
 - CI (`.github/workflows/macos-build.yml`) builds both on Linux and smoke-tests them on `macos-15-intel` and `macos-latest` (arm64): the app must start on the bundled Java 11, print Modelio startup output and log no application error. This proves the app starts, not that the UI works — nothing is clicked.
+- **`.dmg` images and signing**: `.github/scripts/package-dmg.sh` (macOS only) builds the image from the product archive and `run-on-mac.sh` installs/launches it on a Mac in one command. Default is an ad-hoc signature. With a Developer ID certificate (`SIGN_IDENTITY`, optional `NOTARIZE=1`) it adds the hardened runtime, entitlements, signing of the native libraries hidden inside jars (`sign-jar-natives.py`: 10 in the Apple Silicon build, two of them in a jar nested in a jar) and notarization; setup and secrets in `.github/MACOS-SIGNING.md`. CI's `signing-selftest` job exercises everything except Apple's notary service with a throw-away self-signed certificate.
 
 ### Linux and Windows products
 

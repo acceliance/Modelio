@@ -2,12 +2,19 @@ name: macOS build
 
 # Cross-builds the macOS products (Intel x86_64 and Apple Silicon aarch64) with Tycho on Linux, then smoke-tests
 # each archive on a matching macOS runner (extract, clear quarantine, start the app, check it stays up).
-# Each archive is then packaged as a .dmg (ad-hoc signed bundle) on a macOS runner, and the smoke test starts the
-# app from the mounted .dmg and takes a screenshot.
-# Not covered: Developer ID signing, notarization, any real UI interaction.
+# Each archive is then packaged as a .dmg on a macOS runner (ad-hoc signed by default; with the repository secrets of
+# .github/MACOS-SIGNING.md and `sign: true` on a manual run: Developer ID signed + notarized + stapled), and the smoke
+# test starts the app from the mounted .dmg and takes a screenshot. A self-test signs a build with a throw-away
+# certificate (hardened runtime + entitlements) and runs it, which exercises everything except Apple's notary service.
+# Not covered: any real UI interaction.
 
 on:
   workflow_dispatch:
+    inputs:
+      sign:
+        description: 'Sign with the Developer ID certificate and notarize (needs the repository secrets, see .github/MACOS-SIGNING.md)'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'products/**'
@@ -116,6 +123,22 @@ jobs:
         with:
           name: modelio-macosx-${{ matrix.arch }}
 
+      # Only on a manual run with sign=true. Imports the Developer ID certificate from the repository secrets into a
+      # temporary keychain and exports SIGN_*/NOTARY_* for package-dmg.sh (which then also notarizes and staples).
+      - name: Prepare Developer ID signing and notarization
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign }}
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash .github/scripts/ci-prepare-signing.sh
+
       - name: Build the .dmg
         run: |
           bash .github/scripts/package-dmg.sh ${{ matrix.arch }} modelio-*-macosx-${{ matrix.arch }}.tar.gz             "$PWD/Modelio-5.4.1-macosx-${{ matrix.arch }}.dmg"
@@ -158,6 +181,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Remove the temporary keychain and keys
+        if: always()
+        run: bash .github/scripts/ci-cleanup-signing.sh
+
   smoke-test:
     name: Smoke test (${{ matrix.arch }})
     needs: package
@@ -175,6 +202,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: modelio-dmg-${{ matrix.arch }}
@@ -276,35 +305,9 @@ jobs:
 
       # A double-click starts the app through LaunchServices (no shell PATH/JAVA_HOME), which is what a user does.
       - name: Launch like a double-click (open)
-        run: |
-          pkill -f "Contents/MacOS/modelio" 2>/dev/null; sleep 3
-          rm -rf "$HOME/.modelio"
-          open "$APP"
-          OK=0; LOGF=""
-          for i in $(seq 1 24); do
-            sleep 5
-            LOGF="$(ls "$HOME"/.modelio/5.4/modelio-*.log 2>/dev/null | head -1 || true)"
-            if [ -n "$LOGF" ] && grep -q "Changing workspace to" "$LOGF"; then OK=1; echo "reached the workspace stage after about $((i*5))s"; break; fi
-          done
-          echo "log file: $LOGF"
-          echo "---- Modelio processes:"; ps -axo pid,etime,args | grep -E "[C]ontents/MacOS/modelio|[j]re/Contents/Home/bin/java" | cut -c1-200
-          sleep 15
-          screencapture -x "$RUNNER_TEMP/screenshot-open-${{ matrix.arch }}.png" 2>&1 || echo "screencapture failed"
-          [ -n "$LOGF" ] && { echo "---- log tail:"; tail -15 "$LOGF" | cut -c1-180; }
-          if [ "$OK" != 1 ]; then echo "::error::launched with open: the app did not reach the workspace stage"; exit 1; fi
-          # the macOS launcher loads the JVM inside its own process (no separate java process): look at the loaded libjvm
-          PID="$(pgrep -f "Contents/MacOS/modelio" | head -1)"
-          JVMLIB="$(lsof -p "$PID" 2>/dev/null | grep "libjvm.dylib" | grep -o '/.*libjvm.dylib' | head -1)"   # path contains spaces
-          echo "libjvm loaded by the launcher process $PID: $JVMLIB"
-          case "$JVMLIB" in
-            *"Modelio 5.4.1.app/Contents/Eclipse/jre/Contents/Home/"*) ;;
-            *) echo "::error::launched with open: not running on the bundled JRE (libjvm: '$JVMLIB')"; exit 1 ;;
-          esac
-          if grep -qE "Application error|could not be found in the registry|UnsatisfiedLinkError" "$LOGF"; then
-            echo "::error::launched with open: application error in the log"; grep -nE -A4 "Application error|UnsatisfiedLinkError" "$LOGF" | head -20; exit 1
-          fi
-          echo "OK: started with open, on the bundled JRE, no application error"
-          pkill -f "Contents/MacOS/modelio" 2>/dev/null || true
+        env:
+          SHOT_NAME: screenshot-open-${{ matrix.arch }}
+        run: bash .github/scripts/smoke-open.sh "$APP"
 
       - name: Upload screenshot
         if: always()
@@ -325,3 +328,82 @@ jobs:
             ${{ runner.temp }}/sample.txt
             ~/.modelio/**/*.log
           if-no-files-found: ignore
+
+  # Signs a build with a THROW-AWAY self-signed certificate using the same code path as the real Developer ID signing
+  # (hardened runtime, entitlements, natives inside jars, bundle, .dmg) and runs the result. It proves the signed app
+  # works under the hardened runtime. It cannot test Apple's notary service (needs the real certificate).
+  signing-selftest:
+    name: Signing self-test (throw-away certificate)
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: modelio-macosx-aarch64
+
+      - name: Create a throw-away self-signed identity
+        run: bash .github/scripts/ci-selfsigned-identity.sh
+
+      - name: Build the signed .dmg (hardened runtime + entitlements, no notarization)
+        run: bash .github/scripts/package-dmg.sh aarch64 modelio-*-macosx-aarch64.tar.gz "$PWD/signed-test.dmg"
+
+      - name: Check the signatures
+        run: |
+          echo "---- the disk image itself"
+          codesign --verify --verbose=2 signed-test.dmg
+          codesign -dv --verbose=2 signed-test.dmg 2>&1 | grep -E "Identifier|Authority|Signature|Format"
+          MNT="$RUNNER_TEMP/mnt-signed"; mkdir -p "$MNT"
+          hdiutil attach signed-test.dmg -nobrowse -readonly -mountpoint "$MNT" -quiet
+          APP="$RUNNER_TEMP/Modelio 5.4.1.app"
+          ditto "$MNT/Modelio 5.4.1.app" "$APP"
+          hdiutil detach "$MNT" -quiet
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          echo "---- bundle"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          INFO="$(codesign -dv --verbose=4 "$APP" 2>&1)"; echo "$INFO" | grep -E "Identifier|Authority|flags|Timestamp|Signature"
+          echo "$INFO" | grep -q "flags=.*runtime" || { echo "::error::hardened runtime flag missing on the bundle"; exit 1; }
+          ENT="$(codesign -d --entitlements - "$APP" 2>&1)"; echo "$ENT" | grep -E "allow-jit|unsigned-executable|library-validation"
+          for k in allow-jit allow-unsigned-executable-memory disable-library-validation; do echo "$ENT" | grep -q "$k" || { echo "::error::entitlement $k missing"; exit 1; }; done
+          echo "---- the bundled java executable"
+          codesign -dv --verbose=2 "$APP/Contents/Eclipse/jre/Contents/Home/bin/java" 2>&1 | grep -E "flags|Authority|Signature"
+          echo "---- native libraries inside jars must carry a signature"
+          T="$RUNNER_TEMP/jarnatives"; mkdir -p "$T"
+          for j in "$APP"/Contents/Eclipse/plugins/org.eclipse.swt.cocoa.macosx.aarch64_*.jar "$APP"/Contents/Eclipse/plugins/com.sun.jna_5.8.0*.jar; do
+            for e in $(unzip -Z1 "$j" | grep -E '\.jnilib$'); do
+              unzip -o -j -q "$j" "$e" -d "$T"
+              f="$T/$(basename "$e")"
+              codesign --verify --verbose=1 "$f" && echo "signed: $(basename "$j")!$e"
+              rm -f "$f"
+            done
+          done
+          echo "---- the jar of the nested natives (jython inside the script engine bundle)"
+          S="$(ls "$APP"/Contents/Eclipse/plugins/org.modelio.platform.script.engine_*.jar | head -1)"
+          unzip -o -q "$S" 'lib/jython2.7/jython.jar' -d "$T"
+          for e in $(unzip -Z1 "$T/lib/jython2.7/jython.jar" | grep -E '\.jnilib$'); do
+            unzip -o -j -q "$T/lib/jython2.7/jython.jar" "$e" -d "$T"
+            codesign --verify --verbose=1 "$T/$(basename "$e")" && echo "signed: jython.jar!$e"
+          done
+
+      - name: Install with run-on-mac.sh and start the signed app like a double-click
+        env:
+          SHOT_NAME: screenshot-signed-aarch64
+        run: |
+          export INSTALL_DIR="$RUNNER_TEMP/Apps"
+          bash .github/scripts/run-on-mac.sh --no-launch "$PWD/signed-test.dmg"
+          bash .github/scripts/smoke-open.sh "$INSTALL_DIR/Modelio 5.4.1.app"
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-signed-aarch64
+          path: ${{ runner.temp }}/screenshot-*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove the temporary keychain
+        if: always()
+        run: bash .github/scripts/ci-cleanup-signing.sh
