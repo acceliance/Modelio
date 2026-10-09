@@ -2,7 +2,9 @@ name: macOS build
 
 # Cross-builds the macOS products (Intel x86_64 and Apple Silicon aarch64) with Tycho on Linux, then smoke-tests
 # each archive on a matching macOS runner (extract, clear quarantine, start the app, check it stays up).
-# Not covered: signing, notarization, .dmg, any real UI interaction.
+# Each archive is then packaged as a .dmg (ad-hoc signed bundle) on a macOS runner, and the smoke test starts the
+# app from the mounted .dmg and takes a screenshot.
+# Not covered: Developer ID signing, notarization, any real UI interaction.
 
 on:
   workflow_dispatch:
@@ -14,6 +16,7 @@ on:
       - 'build-mac.sh'
       - 'setup-wsl.sh'
       - '.github/workflows/macos-build.yml'
+      - '.github/scripts/**'
 
 concurrency:
   group: macos-build-${{ github.ref }}
@@ -97,9 +100,67 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  package:
+    name: Package .dmg (${{ matrix.arch }})
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: modelio-macosx-${{ matrix.arch }}
+
+      - name: Build the .dmg
+        run: |
+          bash .github/scripts/package-dmg.sh ${{ matrix.arch }} modelio-*-macosx-${{ matrix.arch }}.tar.gz             "$PWD/Modelio-5.4.1-macosx-${{ matrix.arch }}.dmg"
+
+      - name: Test run-on-mac.sh (install from the .dmg, three ways)
+        run: |
+          DMG="$PWD/Modelio-5.4.1-macosx-${{ matrix.arch }}.dmg"
+          export INSTALL_DIR="$RUNNER_TEMP/Apps"
+          APPDIR="$INSTALL_DIR/Modelio 5.4.1.app"
+          check() {
+            test -x "$APPDIR/Contents/MacOS/modelio"
+            codesign --verify --strict --verbose=2 "$APPDIR"
+            if xattr -lr "$APPDIR" | grep -q com.apple.quarantine; then echo "quarantine flag left on the installed app"; exit 1; fi
+            echo "OK: $1"
+          }
+          echo "### 1. script from the repo, pointed at the .dmg"
+          bash .github/scripts/run-on-mac.sh --no-launch "$DMG"; check "path to .dmg"; rm -rf "$INSTALL_DIR"
+
+          echo "### 2. the one-liner: script from inside the mounted image"
+          MNT="$RUNNER_TEMP/mnt-test"; mkdir -p "$MNT"
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" -quiet
+          ls -la "$MNT"
+          bash "$MNT/run-on-mac.sh" --no-launch
+          hdiutil detach "$MNT" -quiet
+          check "run from inside the image"; rm -rf "$INSTALL_DIR"
+
+          echo "### 3. a downloaded copy: quarantine flag + SHA256SUMS.txt next to the .dmg"
+          DL="$RUNNER_TEMP/dl"; mkdir -p "$DL"; cp "$DMG" .github/scripts/run-on-mac.sh "$DL/"
+          (cd "$DL" && shasum -a 256 Modelio-*.dmg > SHA256SUMS.txt && xattr -w com.apple.quarantine "0081;5f000000;Safari;" Modelio-*.dmg && xattr -l Modelio-*.dmg)
+          bash "$DL/run-on-mac.sh" --no-launch "$DL/$(basename "$DMG")"; check "downloaded copy with checksum"; rm -rf "$INSTALL_DIR"
+          if [ "${{ matrix.arch }}" = aarch64 ]; then
+            echo "### 4. no argument: pick the .dmg matching this Mac (Apple Silicon runner)"
+            bash "$DL/run-on-mac.sh" --no-launch; check "auto-detected .dmg"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelio-dmg-${{ matrix.arch }}
+          path: Modelio-5.4.1-macosx-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 14
+
   smoke-test:
     name: Smoke test (${{ matrix.arch }})
-    needs: build
+    needs: package
     strategy:
       fail-fast: false
       matrix:
@@ -116,15 +177,23 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: modelio-macosx-${{ matrix.arch }}
+          name: modelio-dmg-${{ matrix.arch }}
 
-      - name: Extract and clear quarantine
+      - name: Mount the .dmg and copy the app out
         run: |
           echo "runner arch: $(uname -m)"
-          tar xzf modelio-*-macosx-${{ matrix.arch }}.tar.gz
-          APP="$(ls -d *.app | head -1)"
+          DMG="$(ls Modelio-*-macosx-${{ matrix.arch }}.dmg)"
+          hdiutil verify "$DMG"
+          MNT="$RUNNER_TEMP/mnt"; mkdir -p "$MNT"
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT"
+          ls -la "$MNT"
+          SRC="$(ls -d "$MNT"/*.app | head -1)"
+          APP="$RUNNER_TEMP/$(basename "$SRC")"
+          ditto "$SRC" "$APP"
+          hdiutil detach "$MNT"
           echo "APP=$APP" >> "$GITHUB_ENV"
-          xattr -dr com.apple.quarantine "$APP" || true
+          echo "---- signature of the app taken from the .dmg:"
+          codesign --verify --strict --verbose=2 "$APP"
           ls -l "$APP/Contents/MacOS" "$APP/Contents/Eclipse" | head -30
 
       - name: Binary architectures
@@ -179,7 +248,10 @@ jobs:
             fi
             if [ -n "$JV_OK" ] && grep -qE "org\.modelio|logback" "$LOG"; then
               echo "Modelio initialised after about $((i*5))s ($(grep -cE 'org\.modelio' "$LOG") org.modelio log lines)"
-              sleep 10   # let startup continue a little, then summarise what it did
+              sleep 25   # let startup continue (Welcome page, workbench), then summarise and take a screenshot
+              screencapture -x "$RUNNER_TEMP/screenshot-${{ matrix.arch }}.png" 2>&1 || echo "screencapture failed"
+              ls -l "$RUNNER_TEMP"/screenshot-*.png 2>/dev/null
+              osascript -e 'tell application "System Events" to get name of every process whose background only is false' 2>&1 | head -3 || true
               echo "---- log summary: $(wc -l < "$LOG") lines, $(grep -ciE 'exception|error' "$LOG") mention exception/error ----"
               echo "---- first 25 lines ----"; head -25 "$LOG" | cut -c1-200
               echo "---- most frequent messages (numbers masked) ----"
@@ -201,6 +273,47 @@ jobs:
           diagnostics
           kill "$PID" 2>/dev/null
           exit 1
+
+      # A double-click starts the app through LaunchServices (no shell PATH/JAVA_HOME), which is what a user does.
+      - name: Launch like a double-click (open)
+        run: |
+          pkill -f "Contents/MacOS/modelio" 2>/dev/null; sleep 3
+          rm -rf "$HOME/.modelio"
+          open "$APP"
+          OK=0; LOGF=""
+          for i in $(seq 1 24); do
+            sleep 5
+            LOGF="$(ls "$HOME"/.modelio/5.4/modelio-*.log 2>/dev/null | head -1 || true)"
+            if [ -n "$LOGF" ] && grep -q "Changing workspace to" "$LOGF"; then OK=1; echo "reached the workspace stage after about $((i*5))s"; break; fi
+          done
+          echo "log file: $LOGF"
+          echo "---- Modelio processes:"; ps -axo pid,etime,args | grep -E "[C]ontents/MacOS/modelio|[j]re/Contents/Home/bin/java" | cut -c1-200
+          sleep 15
+          screencapture -x "$RUNNER_TEMP/screenshot-open-${{ matrix.arch }}.png" 2>&1 || echo "screencapture failed"
+          [ -n "$LOGF" ] && { echo "---- log tail:"; tail -15 "$LOGF" | cut -c1-180; }
+          if [ "$OK" != 1 ]; then echo "::error::launched with open: the app did not reach the workspace stage"; exit 1; fi
+          # the macOS launcher loads the JVM inside its own process (no separate java process): look at the loaded libjvm
+          PID="$(pgrep -f "Contents/MacOS/modelio" | head -1)"
+          JVMLIB="$(lsof -p "$PID" 2>/dev/null | grep "libjvm.dylib" | grep -o '/.*libjvm.dylib' | head -1)"   # path contains spaces
+          echo "libjvm loaded by the launcher process $PID: $JVMLIB"
+          case "$JVMLIB" in
+            *"Modelio 5.4.1.app/Contents/Eclipse/jre/Contents/Home/"*) ;;
+            *) echo "::error::launched with open: not running on the bundled JRE (libjvm: '$JVMLIB')"; exit 1 ;;
+          esac
+          if grep -qE "Application error|could not be found in the registry|UnsatisfiedLinkError" "$LOGF"; then
+            echo "::error::launched with open: application error in the log"; grep -nE -A4 "Application error|UnsatisfiedLinkError" "$LOGF" | head -20; exit 1
+          fi
+          echo "OK: started with open, on the bundled JRE, no application error"
+          pkill -f "Contents/MacOS/modelio" 2>/dev/null || true
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-${{ matrix.arch }}
+          path: ${{ runner.temp }}/screenshot-*.png
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload logs on failure
         if: failure()
