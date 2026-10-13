@@ -70,6 +70,14 @@ workspace without error, but the UI itself was not exercised. The Apple Silicon 
 How they are built: `build-mac.sh` and `.github/workflows/macos-build.yml`; signing for a future release:
 link:.github/MACOS-SIGNING.md[MACOS-SIGNING.md].
 
+Modelio launched with `open` (like a double-click) on the GitHub macOS runners, right after installation:
+
+.Apple Silicon (aarch64)
+image::README/macos-ci-aarch64.png[Modelio on the Apple Silicon runner,width=800]
+
+.Intel (x86_64)
+image::README/macos-ci-x86_64.png[Modelio on the Intel runner,width=800]
+
 == Modelio Modeling Environment
 
 Modelio is a modeling solution offering a wide range of functionality based on commonly used standards for enterprise architecture, software
