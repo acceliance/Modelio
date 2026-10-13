@@ -33,9 +33,7 @@ image:https://img.shields.io/badge/macOS-Intel%20%7C%20Apple%20Silicon-000000?lo
 image:https://img.shields.io/badge/signature-not%20Apple%20signed-red[Not Apple signed]
 
 This fork publishes `.dmg` images of Modelio 5.4.1 for macOS, with the Java 11 runtime bundled:
-link:https://github.com/acceliance/Modelio/releases/tag/v5.4.1-macos[*Download Modelio 5.4.1 for macOS*]
-
-link:https://github.com/acceliance/Modelio/releases/tag/v5.4.1-macos[*Modelio 5.4.1 for macOS Release Notes*]
+link:https://github.com/acceliance/Modelio/releases/tag/v5.4.1-macos[*Download Modelio 5.4.1 for macOS and Release Notes*]
 (install steps, SHA-256 checksums, CI screenshots)
 
 [cols="2,3",options="header"]
