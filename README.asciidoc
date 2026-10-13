@@ -29,7 +29,7 @@ https://github.com/ModelioOpenSource/Modelio/wiki/Release-541[*Modelio 5.4.1 Rel
 
 === macOS disk images (this fork)
 
-image:https://img.shields.io/badge/macOS-Intel%20%7C%20Apple%20Silicon-000000?logo=apple&logoColor=white[macOS]
+image:https://img.shields.io/badge/macOS-Intel%20%7C%20Apple%20Silicon-000000?logo=apple&logoColor=white[macOS,link=https://github.com/acceliance/Modelio/releases/tag/v5.4.1-macos,window=_blank]
 image:https://img.shields.io/badge/signature-not%20Apple%20signed-red[Not Apple signed]
 
 This fork publishes `.dmg` images of Modelio 5.4.1 for macOS, with the Java 11 runtime bundled:
