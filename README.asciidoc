@@ -27,6 +27,49 @@ https://github.com/ModelioOpenSource/Modelio/wiki[*Modelio 5.4.1 Documentation*]
 === Release Note
 https://github.com/ModelioOpenSource/Modelio/wiki/Release-541[*Modelio 5.4.1 Release Note*]
 
+=== macOS disk images (this fork)
+
+image:https://img.shields.io/badge/macOS-Intel%20%7C%20Apple%20Silicon-000000?logo=apple&logoColor=white[macOS]
+image:https://img.shields.io/badge/signature-not%20Apple%20signed-red[Not Apple signed]
+
+This fork publishes `.dmg` images of Modelio 5.4.1 for macOS, with the Java 11 runtime bundled:
+link:https://github.com/acceliance/Modelio/releases/tag/v5.4.1-macos[*Download Modelio 5.4.1 for macOS*]
+
+[cols="2,3",options="header"]
+|===
+| File | Mac
+
+| `Modelio-5.4.1-macosx-aarch64.dmg`
+| Apple Silicon (M1, M2, M3, ...)
+
+| `Modelio-5.4.1-macosx-x86_64.dmg`
+| Intel (also runs on Apple Silicon through Rosetta 2)
+|===
+
+CAUTION: *These images are not signed with an Apple Developer ID certificate and are not notarized by Apple.* They only
+carry an ad-hoc signature, so Gatekeeper refuses to open the app on first launch ("Apple could not verify..." or "the app is
+damaged"). Only install them if you trust this repository and have checked the SHA-256 checksums (`SHA256SUMS.txt` in the
+release). They are provided *as is, without any warranty* (GPL v3) and are *not* an official Modeliosoft / Modelio Open
+Source release.
+
+To install, check the download, open the `.dmg` and run the installer script it contains (it copies the app to
+`/Applications`, clears the quarantine flag and starts it):
+
+[source,bash]
+----
+shasum -a 256 -c SHA256SUMS.txt
+bash "/Volumes/Modelio 5.4.1 (aarch64)/run-on-mac.sh"    # "(x86_64)" for the Intel image
+----
+
+Or drag *Modelio 5.4.1.app* to `/Applications` and run
+`xattr -dr com.apple.quarantine "/Applications/Modelio 5.4.1.app"`. If macOS still blocks it, use
+_System Settings > Privacy & Security > Open Anyway_.
+
+The images were checked on GitHub macOS runners (Intel and Apple M2): the app starts on the bundled Java 11 and reaches the
+workspace without error, but the UI itself was not exercised. The Apple Silicon image has no code formatting (astyle) support.
+How they are built: `build-mac.sh` and `.github/workflows/macos-build.yml`; signing for a future release:
+link:.github/MACOS-SIGNING.md[MACOS-SIGNING.md].
+
 == Modelio Modeling Environment
 
 Modelio is a modeling solution offering a wide range of functionality based on commonly used standards for enterprise architecture, software
