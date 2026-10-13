@@ -52,14 +52,20 @@ damaged"). Only install them if you trust this repository and have checked the S
 release). They are provided *as is, without any warranty* (GPL v3) and are *not* an official Modeliosoft / Modelio Open
 Source release.
 
-To install, check the download, open the `.dmg` and run the installer script it contains (it copies the app to
-`/Applications`, clears the quarantine flag and starts it):
+To install, use the `run-on-mac.sh` installer script. It picks the image for your Mac (Apple Silicon or Intel), checks it
+against `SHA256SUMS.txt`, copies the app to `/Applications` (or `~/Applications`), clears the quarantine flag and starts
+it. Download `run-on-mac.sh` and `SHA256SUMS.txt` from the release into the same folder as the `.dmg`, then:
 
 [source,bash]
 ----
-shasum -a 256 -c SHA256SUMS.txt
-bash "/Volumes/Modelio 5.4.1 (aarch64)/run-on-mac.sh"    # "(x86_64)" for the Intel image
+cd ~/Downloads
+bash run-on-mac.sh
 ----
+
+Options: `--log` runs Modelio in the Terminal with its log on screen, `--no-launch` only installs, and a `.dmg` path as
+argument forces a given image. The same script is inside each `.dmg`, so you can also run it from the opened image:
+`bash "/Volumes/Modelio 5.4.1 (aarch64)/run-on-mac.sh"` (`(x86_64)` for the Intel image). Full instructions and
+troubleshooting: link:https://github.com/acceliance/Modelio/releases/download/v5.4.1-macos/RUN-ON-MAC.txt[RUN-ON-MAC.txt].
 
 Or drag *Modelio 5.4.1.app* to `/Applications` and run
 `xattr -dr com.apple.quarantine "/Applications/Modelio 5.4.1.app"`. If macOS still blocks it, use
