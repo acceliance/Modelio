@@ -1,6 +1,6 @@
 link:https://www.modelio.org[image:README/logo-modelio-v4.png[]]
 
-image:https://img.shields.io/badge/Modelio-5.4.1-blue[Modelio 5.4.1,link=https://github.com/ModelioOpenSource/Modelio/releases/tag/v5.4.1,window=_blank]
+image:https://img.shields.io/badge/Modelio-5.4.1-blue[Modelio 5.4.1,link=https://github.com/acceliance/Modelio/releases/tag/v5.4.1-macos,window=_blank]
 image:https://img.shields.io/badge/licence-GPL%20v3-blue?logo=gnu&logoColor=white[GPL v3,link=LICENSE]
 image:https://img.shields.io/badge/Java-11-007396?logo=openjdk&logoColor=white[Java 11]
 image:https://img.shields.io/badge/build-Maven%20%2F%20Tycho%204.0.13-C71A36?logo=apachemaven&logoColor=white[Maven / Tycho]
